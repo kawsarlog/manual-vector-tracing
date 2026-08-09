@@ -1176,7 +1176,7 @@ p:last-child {
 }
 
 .form-status--ok {
-  color: var(--green);
+  color: var(--blue);
 }
 
 .form-status--err {
