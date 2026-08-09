@@ -1260,6 +1260,51 @@ p:last-child {
   font-size: 1.1rem;
 }
 
+/* Legal pages (privacy / terms) */
+.legal {
+  max-width: 48rem;
+}
+
+.legal > p.legal-meta {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+.legal h2 {
+  font-size: 1.35rem;
+  margin-top: 2rem;
+  margin-bottom: 0.65rem;
+}
+
+.legal h2:first-of-type {
+  margin-top: 0;
+}
+
+.legal h3 {
+  font-size: 1.1rem;
+  margin-top: 1.35rem;
+  margin-bottom: 0.45rem;
+}
+
+.legal ul {
+  margin: 0 0 1em;
+  padding-left: 1.25rem;
+}
+
+.legal li {
+  margin-bottom: 0.4em;
+  color: var(--ink-soft);
+}
+
+.legal li::marker {
+  color: var(--blue);
+}
+
+.legal p {
+  color: var(--ink-soft);
+}
+
 /* Pricing */
 .pricing-grid {
   display: grid;
