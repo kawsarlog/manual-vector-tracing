@@ -1,16 +1,19 @@
-/**
+﻿/**
  * Manual Vector Tracing — quote/contact email via Brevo Transactional API.
  * Same provider & pattern as RS Graphic Design (POST https://api.brevo.com/v3/smtp/email).
  *
  * Vercel Environment Variables:
  *   BREVO_API_KEY     (required) — Brevo dashboard → SMTP & API → API keys
- *   RFQ_TO_EMAIL      (optional) — inbox that receives quotes (default: hello@manualvectortracing.com)
- *   RFQ_TO_NAME       (optional) — default: Sales Team
- *   RFQ_FROM_EMAIL    (optional) — verified Brevo sender (default: noreply@manualvectortracing.com)
+ *   RFQ_FROM_EMAIL    (optional) — verified Brevo sender (default: updates.from.kawsar@gmail.com)
  *   RFQ_FROM_NAME     (optional) — default: Manual Vector Tracing
+ *
+ * Quote TO is hardcoded to hello@rsgraphicdesign.com (RFQ_TO_EMAIL is ignored).
  */
 
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+const MAX_FILES = 5;
+/** Soft guard so we do not accept huge base64 bodies (Vercel hobby ~4.5 MB). */
+const MAX_ATTACH_CONTENT_CHARS = Math.floor(4 * 1024 * 1024);
 
 function escapeHtml(value) {
   return String(value)
@@ -22,6 +25,13 @@ function escapeHtml(value) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function stripDataUrlPrefix(value) {
+  const s = String(value || "");
+  const comma = s.indexOf(",");
+  if (s.startsWith("data:") && comma !== -1) return s.slice(comma + 1);
+  return s;
 }
 
 function row(label, value) {
@@ -37,15 +47,23 @@ function formatBytes(bytes) {
   return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
+/**
+ * Normalize file list from the quote form.
+ * Preserves optional contentBase64 (stripped of data: URL prefix) for Brevo attachments.
+ * Does not log or return full base64 in error paths.
+ */
 function normalizeFiles(data) {
   const out = [];
   const seen = new Set();
+  let totalContentChars = 0;
 
   const pushEntry = (entry) => {
-    if (!entry) return;
+    if (!entry || out.length >= MAX_FILES) return;
     let name = "";
     let size = null;
     let type = "";
+    let contentBase64 = "";
+    let note = "";
     if (typeof entry === "string") {
       name = entry.trim();
     } else if (typeof entry === "object") {
@@ -53,12 +71,33 @@ function normalizeFiles(data) {
       const rawSize = entry.size ?? entry.bytes;
       size = Number.isFinite(Number(rawSize)) ? Number(rawSize) : null;
       type = String(entry.type || "").trim();
+      note = String(entry.note || "").trim();
+      const rawContent = entry.contentBase64 ?? entry.content ?? entry.base64 ?? "";
+      if (rawContent && typeof rawContent === "string") {
+        contentBase64 = stripDataUrlPrefix(rawContent).replace(/\s+/g, "");
+      }
     }
     if (!name) return;
     const key = name.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ name, size, type });
+
+    if (contentBase64) {
+      if (
+        contentBase64.length > MAX_ATTACH_CONTENT_CHARS ||
+        totalContentChars + contentBase64.length > MAX_ATTACH_CONTENT_CHARS
+      ) {
+        contentBase64 = "";
+        if (!note) note = "too large to attach — use WhatsApp";
+      } else {
+        totalContentChars += contentBase64.length;
+      }
+    }
+
+    const item = { name, size, type };
+    if (contentBase64) item.contentBase64 = contentBase64;
+    if (note) item.note = note;
+    out.push(item);
   };
 
   if (Array.isArray(data.files) && data.files.length) {
@@ -73,7 +112,7 @@ function normalizeFiles(data) {
       .forEach(pushEntry);
   }
 
-  return out.slice(0, 5);
+  return out.slice(0, MAX_FILES);
 }
 
 function filesRowHtml(files) {
@@ -83,8 +122,15 @@ function filesRowHtml(files) {
   const list = files
     .map((f) => {
       const sizeLabel = formatBytes(f.size);
-      const label = sizeLabel ? `${escapeHtml(f.name)} (${escapeHtml(sizeLabel)})` : escapeHtml(f.name);
-      return `<li style="margin:0 0 4px;">${label}</li>`;
+      const attached = Boolean(f.contentBase64);
+      const bits = [escapeHtml(f.name)];
+      if (sizeLabel) bits.push(`(${escapeHtml(sizeLabel)})`);
+      if (attached) {
+        bits.push("— attached");
+      } else if (f.note) {
+        bits.push(`— ${escapeHtml(f.note)}`);
+      }
+      return `<li style="margin:0 0 4px;">${bits.join(" ")}</li>`;
     })
     .join("");
   return `<tr><td style="padding:10px 0;border-bottom:1px solid #1f2937;"><span style="color:#9ca3af;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;">Selected files (${files.length})</span><br><ul style="margin:8px 0 0;padding-left:1.15rem;color:#111827;font-size:15px;font-weight:600;line-height:1.45;">${list}</ul></td></tr>`;
@@ -115,7 +161,6 @@ function buildHtml(payload) {
                   ${row("Source website", "https://manualvectortracing.com")}
                   ${row("Name", payload.name)}
                   ${row("Email", payload.email)}
-                  ${row("Phone", payload.phone)}
                   ${row("Intended use", payload.use)}
                   ${row("Deadline", payload.deadline)}
                   ${filesRowHtml(files)}
@@ -128,6 +173,7 @@ function buildHtml(payload) {
                 <p style="margin:18px 0 0;font-size:12px;color:#6b7280;line-height:1.5;">
                   This message was sent from the Manual Vector Tracing contact/quote form.
                   Reply directly to the submitter (${escapeHtml(payload.email)}).
+                  Artwork files with email attachments appear in this message when size limits allow.
                 </p>
               </td>
             </tr>
@@ -139,17 +185,36 @@ function buildHtml(payload) {
 </html>`.trim();
 }
 
+/**
+ * Build Brevo attachment array from normalized files that include contentBase64.
+ * Images, PDFs, AI, etc. all attach the same way when base64 is present.
+ */
+function buildAttachments(files) {
+  if (!Array.isArray(files) || !files.length) return [];
+  const out = [];
+  for (const f of files) {
+    if (!f || !f.contentBase64 || !f.name) continue;
+    out.push({
+      name: String(f.name).slice(0, 200),
+      content: f.contentBase64,
+    });
+  }
+  return out;
+}
+
 async function sendViaBrevo(payload) {
   const apiKey = (process.env.BREVO_API_KEY || "").trim();
   if (!apiKey) {
     return { ok: false, message: "Brevo API key is not configured." };
   }
 
-  const sender = (process.env.RFQ_FROM_EMAIL || "noreply@manualvectortracing.com").trim();
-  const recipient = (process.env.RFQ_TO_EMAIL || "hello@manualvectortracing.com").trim();
+  const sender = (process.env.RFQ_FROM_EMAIL || "updates.from.kawsar@gmail.com").trim();
   const senderName = (process.env.RFQ_FROM_NAME || "Manual Vector Tracing").trim();
-  const recipientName = (process.env.RFQ_TO_NAME || "Sales Team").trim();
+  // Hardcoded — do not use RFQ_TO_EMAIL (missing/wrong env must not break delivery).
+  const recipient = "hello@rsgraphicdesign.com";
+  const recipientName = "Sales Team";
   const subject = `[Manual Vector Tracing] New quote request from ${payload.name}`;
+  const attachments = buildAttachments(payload.files);
 
   const body = {
     sender: { name: senderName, email: sender },
@@ -158,6 +223,10 @@ async function sendViaBrevo(payload) {
     replyTo: { email: payload.email, name: payload.name },
     htmlContent: buildHtml(payload),
   };
+
+  if (attachments.length) {
+    body.attachment = attachments;
+  }
 
   let response;
   try {
@@ -175,7 +244,7 @@ async function sendViaBrevo(payload) {
   }
 
   if (response.ok) {
-    return { ok: true, message: "" };
+    return { ok: true, message: "", attached: attachments.length };
   }
 
   let detail = "";
@@ -209,10 +278,17 @@ module.exports = async function handler(req, res) {
 
   const data = typeof req.body === "object" && req.body ? req.body : {};
   const files = normalizeFiles(data);
+  const attachCount = files.filter((f) => f.contentBase64).length;
+  /* Log counts only — never full base64 */
+  if (files.length) {
+    console.log(
+      `[contact] files=${files.length} attachable=${attachCount} names=${files.map((f) => f.name).join(", ")}`
+    );
+  }
+
   const fields = {
     name: String(data.name || "").trim(),
     email: String(data.email || "").trim(),
-    phone: String(data.phone || "").trim(),
     use: String(data.use || "").trim(),
     deadline: String(data.deadline || "").trim(),
     message: String(data.message || data.details || "").trim(),
@@ -238,5 +314,5 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  res.status(200).json({ status: "success" });
+  res.status(200).json({ status: "success", attached: result.attached || 0 });
 };

@@ -73,6 +73,11 @@
   }
 
   const MAX_QUOTE_FILES = 5;
+  /** Prefer attaching images/PDFs under this size each (~1.5 MB). */
+  const MAX_ATTACH_FILE_BYTES = Math.floor(1.5 * 1024 * 1024);
+  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). Base64 adds ~33%. */
+  const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
+  const TOO_LARGE_NOTE = "too large to attach — use WhatsApp";
   let selectedFiles = [];
   const dropzone = document.querySelector(".dropzone");
   const fileInput = document.querySelector("#file-input");
@@ -85,6 +90,79 @@
     if (n < 1024) return `${Math.round(n)} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
     return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  };
+
+  const stripDataUrlPrefix = (value) => {
+    const s = String(value || "");
+    const comma = s.indexOf(",");
+    if (s.startsWith("data:") && comma !== -1) return s.slice(comma + 1);
+    return s;
+  };
+
+  /**
+   * Read a File as raw base64 (no data: URL prefix).
+   * @param {File} file
+   * @returns {Promise<string>}
+   */
+  const readFileAsBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          resolve(stripDataUrlPrefix(reader.result));
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  /**
+   * Build files payload for /api/contact — attach when size budget allows.
+   * @param {File[]} files
+   * @returns {Promise<{ files: Array<{name:string,type:string,size:number,contentBase64?:string,note?:string}>, skippedLarge: number }>}
+   */
+  const buildFilesPayload = async (files) => {
+    const list = (files || []).slice(0, MAX_QUOTE_FILES);
+    const out = [];
+    let budget = MAX_PAYLOAD_BYTES - 12 * 1024; /* leave room for text fields */
+    let skippedLarge = 0;
+
+    for (const file of list) {
+      const entry = {
+        name: file.name,
+        type: file.type || "",
+        size: file.size,
+      };
+
+      if (!file.size || file.size > MAX_ATTACH_FILE_BYTES) {
+        entry.note = TOO_LARGE_NOTE;
+        skippedLarge += 1;
+        out.push(entry);
+        continue;
+      }
+
+      try {
+        const contentBase64 = await readFileAsBase64(file);
+        /* Base64 string length ≈ bytes in the JSON body for this field */
+        const encodedBytes = contentBase64.length;
+        if (encodedBytes > budget) {
+          entry.note = TOO_LARGE_NOTE;
+          skippedLarge += 1;
+          out.push(entry);
+          continue;
+        }
+        entry.contentBase64 = contentBase64;
+        budget -= encodedBytes;
+      } catch (_) {
+        entry.note = TOO_LARGE_NOTE;
+        skippedLarge += 1;
+      }
+      out.push(entry);
+    }
+
+    return { files: out, skippedLarge };
   };
 
   const syncFileInput = () => {
@@ -119,7 +197,7 @@
     title.textContent =
       count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
     hint.textContent =
-      "Names noted on your quote — attach files in WhatsApp if needed";
+      "Files email as attachments when under size limits (else use WhatsApp)";
   };
 
   const renderSelectedFiles = () => {
@@ -257,13 +335,6 @@
       const use = String(fd.get("use") || "").trim();
       const deadline = String(fd.get("deadline") || "").trim();
       const details = String(fd.get("details") || "").trim();
-      const filesMeta = selectedFiles.map((file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type || "",
-      }));
-      const fileNames = filesMeta.map((f) => f.name);
-      const fileName = fileNames.join(", ");
 
       const showStatus = (html, ok = true) => {
         if (!note) return;
@@ -278,44 +349,74 @@
         return;
       }
 
-      const lines = [
-        "Free vector quote request (Manual Vector Tracing)",
-        "",
-        `Name: ${name}`,
-        `Email: ${email}`,
-        `Intended use: ${use || "—"}`,
-        `Deadline: ${deadline || "—"}`,
-        `Details: ${details || "—"}`,
-      ];
-      if (fileNames.length) {
-        lines.push(
-          `Selected files (please attach in chat): ${fileNames
-            .map((n, i) => {
-              const size = formatFileSize(filesMeta[i].size);
-              return size ? `${n} (${size})` : n;
-            })
-            .join(", ")}`
-        );
-      }
-      const waBody = lines.join("\n");
-      const waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(waBody)}`;
-
-      const payload = {
-        name,
-        email,
-        use,
-        deadline,
-        message: details,
-        files: filesMeta,
-        fileNames,
-        fileName,
-        timestamp: new Date().toISOString(),
-      };
-
       if (submitBtn) submitBtn.disabled = true;
-      showStatus("Sending your quote request…", true);
+      showStatus(
+        selectedFiles.length
+          ? "Preparing files and sending your quote request…"
+          : "Sending your quote request…",
+        true
+      );
+
+      const fallbackWaUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(
+        [
+          "Free vector quote request (Manual Vector Tracing)",
+          "",
+          `Name: ${name}`,
+          `Email: ${email}`,
+          `Intended use: ${use || "—"}`,
+          `Deadline: ${deadline || "—"}`,
+          `Details: ${details || "—"}`,
+        ].join("\n")
+      )}`;
+      let waUrl = fallbackWaUrl;
 
       try {
+        const { files: filesMeta, skippedLarge } = await buildFilesPayload(selectedFiles);
+        const fileNames = filesMeta.map((f) => f.name);
+        const fileName = fileNames.join(", ");
+
+        const lines = [
+          "Free vector quote request (Manual Vector Tracing)",
+          "",
+          `Name: ${name}`,
+          `Email: ${email}`,
+          `Intended use: ${use || "—"}`,
+          `Deadline: ${deadline || "—"}`,
+          `Details: ${details || "—"}`,
+        ];
+        if (fileNames.length) {
+          lines.push(
+            `Selected files: ${fileNames
+              .map((n, i) => {
+                const size = formatFileSize(filesMeta[i].size);
+                const tagged = filesMeta[i].contentBase64
+                  ? `${n}${size ? ` (${size})` : ""}`
+                  : `${n}${size ? ` (${size})` : ""} — ${TOO_LARGE_NOTE}`;
+                return tagged;
+              })
+              .join(", ")}`
+          );
+          if (skippedLarge) {
+            lines.push(
+              `(${skippedLarge} file(s) too large for email attach — please send via WhatsApp)`
+            );
+          }
+        }
+        const waBody = lines.join("\n");
+        waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(waBody)}`;
+
+        const payload = {
+          name,
+          email,
+          use,
+          deadline,
+          message: details,
+          files: filesMeta,
+          fileNames,
+          fileName,
+          timestamp: new Date().toISOString(),
+        };
+
         const res = await fetch("/api/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -348,7 +449,6 @@
             form_name: "contact_quote",
             method: "quote_form",
             email: email || undefined,
-            phone: String(fd.get("phone") || "").trim() || undefined,
             use: use || undefined,
             has_file: fileNames.length > 0,
             file_count: fileNames.length,
@@ -357,18 +457,11 @@
           window.trackEvent("generate_lead", leadPayload);
         }
 
-        const attachHint = fileNames.length
-          ? ` To send <strong>${escapeHtml(
-              fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`
-            )}</strong>, you can <a href="${waUrl}" target="_blank" rel="noopener noreferrer">attach on WhatsApp</a>.`
-          : ` Prefer chat? <a href="${waUrl}" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a>.`;
-
-        showStatus(
-          `Thanks${name ? `, ${escapeHtml(name)}` : ""} — your quote request was emailed to us. We’ll reply soon.${attachHint}`,
-          true
-        );
-        form.reset();
-        clearSelectedFiles();
+        /* Post-submit thank-you page (dedicated page vs RS in-modal success).
+           Fire tracking above before navigating so GTM/Ads still receive the events. */
+        const thanksQs = name ? `?name=${encodeURIComponent(name)}` : "";
+        window.location.assign(`thanks.html${thanksQs}`);
+        return;
       } catch (_) {
         showStatus(
           `Network error — please try again or <a href="${waUrl}" target="_blank" rel="noopener noreferrer">send via WhatsApp</a>.`,

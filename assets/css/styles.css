@@ -1260,6 +1260,44 @@ p:last-child {
   font-size: 1.1rem;
 }
 
+/* Post-submit thank-you */
+.thanks-hero {
+  min-height: calc(100vh - var(--header-h) - 12rem);
+  display: flex;
+  align-items: center;
+}
+
+.thanks-panel {
+  max-width: 40rem;
+}
+
+.thanks-panel h1 {
+  color: var(--ink);
+}
+
+.thanks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.thanks-note {
+  margin-top: 1.75rem;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+
+.thanks-note a {
+  color: var(--blue);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.thanks-note a:hover {
+  text-decoration: underline;
+}
+
 /* Legal pages (privacy / terms) */
 .legal {
   max-width: 48rem;
