@@ -1172,6 +1172,60 @@ p:last-child {
   margin-left: 1rem;
 }
 
+/* Form status + upload hint (contact) */
+.form-hint {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.form-status {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--blue);
+}
+
+.form-status--err {
+  color: var(--danger);
+}
+
+.form-status a {
+  text-decoration: underline;
+}
+
+/* Floating WhatsApp — site blue, modest FAB */
+.wa-float {
+  position: fixed;
+  right: max(0.85rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-overlay);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 24px rgba(0, 72, 212, 0.38);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.wa-float:hover,
+.wa-float:focus-visible {
+  background: var(--blue-deep);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 72, 212, 0.42);
+  outline: none;
+}
+
+.wa-float:focus-visible {
+  outline: 2px solid var(--blue-soft);
+  outline-offset: 3px;
+}
+
 .socials {
   display: flex;
   gap: 0.55rem;
@@ -1461,6 +1515,10 @@ select:focus {
 
 /* Mobile */
 @media (max-width: 980px) {
+  :root {
+    --header-h: 68px;
+  }
+
   .hero__grid,
   .split,
   .two-col,
@@ -1536,6 +1594,7 @@ select:focus {
     max-height: min(70vh, calc(100dvh - var(--header-h)));
     overflow-y: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     transform: translateY(-120%);
     opacity: 0;
     pointer-events: none;
@@ -1575,6 +1634,19 @@ select:focus {
 
   .cta-band__inner .btn {
     width: 100%;
+  }
+
+  body {
+    padding-bottom: 4.25rem;
+  }
+
+  .ba__stage {
+    touch-action: none;
+    -webkit-user-select: none;
+  }
+
+  .ba__range {
+    min-height: 44px;
   }
 }
 
@@ -1617,6 +1689,11 @@ select:focus {
     font-size: clamp(1.75rem, 8vw, 2.25rem);
   }
 
+  .hero__lead,
+  .page-hero p {
+    font-size: 1rem;
+  }
+
   .hero__actions {
     flex-direction: column;
     align-items: stretch;
@@ -1625,6 +1702,7 @@ select:focus {
   .hero__actions .btn {
     width: 100%;
     justify-content: center;
+    min-height: 48px;
   }
 
   .ba__labels span {
@@ -1647,9 +1725,23 @@ select:focus {
     padding: 1.5rem 1rem;
   }
 
+  .form-hint {
+    font-size: 0.88rem;
+  }
+
   .price-card .btn,
   .form-grid .btn {
     width: 100%;
+    min-height: 48px;
+  }
+
+  .wa-float {
+    width: 48px;
+    height: 48px;
+  }
+
+  .quote p {
+    overflow-wrap: anywhere;
   }
 
   .footer-bottom {
