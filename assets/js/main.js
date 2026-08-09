@@ -2,15 +2,25 @@
   const toggle = document.querySelector(".nav-toggle");
   const nav = document.querySelector(".nav");
   if (toggle && nav) {
-    toggle.addEventListener("click", () => {
-      const open = nav.classList.toggle("is-open");
+    const setMenuOpen = (open) => {
+      nav.classList.toggle("is-open", open);
       toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+    };
+
+    toggle.addEventListener("click", () => {
+      setMenuOpen(!nav.classList.contains("is-open"));
     });
     nav.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", () => {
-        nav.classList.remove("is-open");
-        toggle.setAttribute("aria-expanded", "false");
-      });
+      link.addEventListener("click", () => setMenuOpen(false));
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    });
+    document.addEventListener("click", (e) => {
+      if (!nav.classList.contains("is-open")) return;
+      if (nav.contains(e.target) || toggle.contains(e.target)) return;
+      setMenuOpen(false);
     });
   }
 
@@ -259,7 +269,13 @@
 
   if (isHomePage && nav) {
     const spyTargets = [
-      { id: "top", test: (href) => /^(?:index\.html)?(?:#(?:top)?)?$|^\/$|^#$|^index\.html#top$/i.test(href.trim()) },
+      {
+        id: "top",
+        test: (href) => {
+          const h = href.trim();
+          return h === "" || h === "/" || h === "#" || h === "#top" || /^index\.html(?:#top)?$/i.test(h);
+        },
+      },
       { id: "why", test: () => false },
       { id: "how", test: (href) => /#how\b/i.test(href) },
       { id: "portfolio", test: (href) => /#portfolio\b/i.test(href) },
@@ -294,20 +310,21 @@
         });
       };
 
-      const visible = new Map();
       let currentId = "top";
+      let spyLockUntil = 0;
       const headerOffset = () => {
         const raw = getComputedStyle(document.documentElement).getPropertyValue("--header-h").trim();
         const n = Number.parseFloat(raw);
         return Number.isFinite(n) ? n : 76;
       };
 
+      const linkedIds = new Set(
+        spyTargets
+          .filter((t) => spyLinks.some((a) => t.test(a.getAttribute("href") || "")))
+          .map((t) => t.id)
+      );
+
       const resolveLinkedId = (id) => {
-        const linkedIds = new Set(
-          spyTargets
-            .filter((t) => spyLinks.some((a) => t.test(a.getAttribute("href") || "")))
-            .map((t) => t.id)
-        );
         if (linkedIds.has(id)) return id;
         const order = elements.map((e) => e.id);
         const idx = order.indexOf(id);
@@ -317,32 +334,48 @@
         return "top";
       };
 
-      const spyIo = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            visible.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
-          });
-          let bestId = currentId;
-          let bestRatio = 0;
-          elements.forEach(({ id }) => {
-            const ratio = visible.get(id) || 0;
-            if (ratio > bestRatio) {
-              bestRatio = ratio;
-              bestId = id;
-            }
-          });
-          if (bestRatio > 0) {
-            currentId = resolveLinkedId(bestId);
-            setActiveSection(currentId);
-          }
-        },
-        {
-          threshold: [0, 0.15, 0.35, 0.55, 0.75],
-          rootMargin: `-${headerOffset()}px 0px -45% 0px`,
+      /* Prefer the last section whose document top has crossed below the fixed header */
+      const updateSpy = () => {
+        if (performance.now() < spyLockUntil) return;
+        const y = window.scrollY + headerOffset() + 12;
+        let active = elements[0]?.id || "top";
+        for (const { id, el } of elements) {
+          if (el.offsetTop <= y) active = id;
         }
-      );
+        const next = resolveLinkedId(active);
+        if (next !== currentId) {
+          currentId = next;
+          setActiveSection(currentId);
+        }
+      };
 
-      elements.forEach(({ el }) => spyIo.observe(el));
+      let ticking = false;
+      const onScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          ticking = false;
+          updateSpy();
+        });
+      };
+
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+      window.addEventListener("hashchange", () => setTimeout(updateSpy, 50));
+      nav.querySelectorAll("a").forEach((link) => {
+        link.addEventListener("click", () => {
+          const href = link.getAttribute("href") || "";
+          const matched = spyTargets.find((t) => t.test(href));
+          if (matched && linkedIds.has(matched.id)) {
+            currentId = matched.id;
+            setActiveSection(currentId);
+            /* Keep highlight stable while smooth-scroll animates */
+            spyLockUntil = performance.now() + 750;
+          }
+          setTimeout(updateSpy, 800);
+        });
+      });
+      updateSpy();
       setActiveSection(currentId);
     }
   }

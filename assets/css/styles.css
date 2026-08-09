@@ -1637,16 +1637,43 @@ select:focus {
   }
 
   .site-header__inner {
-    gap: 0.75rem;
+    gap: 0.55rem;
+  }
+
+  .logo {
+    order: 1;
+    min-width: 0;
+  }
+
+  .header-cta {
+    order: 2;
+    display: inline-flex;
+    margin-left: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    max-width: min(11.5rem, 42vw);
+    white-space: nowrap;
+  }
+
+  .header-cta .btn__sub {
+    display: none;
   }
 
   .nav-toggle {
+    order: 3;
     display: inline-flex;
     min-width: 44px;
     min-height: 44px;
+    flex-shrink: 0;
   }
 
   .nav {
+    order: 4;
     position: fixed;
     inset: var(--header-h) 0 auto 0;
     background: var(--white);
@@ -1678,10 +1705,6 @@ select:focus {
     transform: translateY(0);
     opacity: 1;
     pointer-events: auto;
-  }
-
-  .header-cta {
-    display: none;
   }
 
   .format-chip {
@@ -1721,7 +1744,24 @@ select:focus {
 
   .trust__grid {
     grid-template-columns: 1fr 1fr;
-    gap: 1.15rem;
+    gap: 1rem 0.85rem;
+  }
+
+  .trust__item {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.4rem;
+  }
+
+  .trust__item strong {
+    font-size: clamp(1.15rem, 5.5vw, 1.35rem);
+  }
+
+  .trust__item span {
+    display: block;
+    line-height: 1.3;
+    max-width: 9.5rem;
   }
 
   .hero__checks,
@@ -1736,16 +1776,28 @@ select:focus {
   }
 
   .logo img {
-    height: 42px;
+    height: 40px;
+    max-width: min(168px, 46vw);
   }
 
   .site-footer .logo img {
     height: 36px;
   }
 
+  .eyebrow {
+    white-space: normal;
+    line-height: 1.45;
+    text-wrap: balance;
+    flex-wrap: wrap;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
   .hero h1,
   .page-hero h1 {
-    font-size: clamp(1.75rem, 8vw, 2.25rem);
+    font-size: clamp(1.7rem, 7.6vw, 2.2rem);
+    overflow-wrap: anywhere;
+    text-wrap: balance;
   }
 
   .hero__lead,
@@ -1770,6 +1822,24 @@ select:focus {
   }
 
   .ba__handle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .faq summary {
+    min-height: 44px;
+    padding: 0.35rem 0;
+  }
+
+  .footer-links a,
+  .footer-bottom a,
+  .footer-contact a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .socials a {
     width: 44px;
     height: 44px;
   }
