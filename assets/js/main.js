@@ -72,15 +72,145 @@
     setPos(52);
   }
 
+  const MAX_QUOTE_FILES = 5;
+  let selectedFiles = [];
   const dropzone = document.querySelector(".dropzone");
   const fileInput = document.querySelector("#file-input");
+  const fileListEl = document.querySelector("[data-file-list]");
+  const fileLimitMsg = document.querySelector("[data-file-limit-msg]");
+
+  const formatFileSize = (bytes) => {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return "";
+    if (n < 1024) return `${Math.round(n)} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+  };
+
+  const syncFileInput = () => {
+    if (!fileInput) return;
+    const dt = new DataTransfer();
+    selectedFiles.forEach((file) => dt.items.add(file));
+    fileInput.files = dt.files;
+  };
+
+  const setFileLimitMessage = (message) => {
+    if (!fileLimitMsg) return;
+    if (message) {
+      fileLimitMsg.hidden = false;
+      fileLimitMsg.textContent = message;
+    } else {
+      fileLimitMsg.hidden = true;
+      fileLimitMsg.textContent = "";
+    }
+  };
+
+  const updateDropzoneCopy = () => {
+    if (!dropzone) return;
+    const title = dropzone.querySelector("strong");
+    const hint = dropzone.querySelector("span");
+    if (!title || !hint) return;
+    if (!selectedFiles.length) {
+      title.textContent = "Drag & drop your logo here";
+      hint.textContent = "or click to browse · JPG, PNG, PDF, AI, SVG";
+      return;
+    }
+    const count = selectedFiles.length;
+    title.textContent =
+      count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
+    hint.textContent =
+      "Names noted on your quote — attach files in WhatsApp if needed";
+  };
+
+  const renderSelectedFiles = () => {
+    updateDropzoneCopy();
+    if (!fileListEl) return;
+    fileListEl.innerHTML = "";
+    if (!selectedFiles.length) {
+      fileListEl.hidden = true;
+      return;
+    }
+    fileListEl.hidden = false;
+    selectedFiles.forEach((file, index) => {
+      const li = document.createElement("li");
+      li.className = "file-list__item";
+
+      const meta = document.createElement("div");
+      meta.className = "file-list__meta";
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "file-list__name";
+      nameEl.textContent = file.name;
+
+      const sizeEl = document.createElement("span");
+      sizeEl.className = "file-list__size";
+      sizeEl.textContent = formatFileSize(file.size);
+
+      meta.appendChild(nameEl);
+      if (sizeEl.textContent) meta.appendChild(sizeEl);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "file-list__remove";
+      removeBtn.setAttribute("aria-label", `Remove ${file.name}`);
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", () => {
+        selectedFiles = selectedFiles.filter((_, i) => i !== index);
+        syncFileInput();
+        setFileLimitMessage("");
+        renderSelectedFiles();
+      });
+
+      li.appendChild(meta);
+      li.appendChild(removeBtn);
+      fileListEl.appendChild(li);
+    });
+  };
+
+  const clearSelectedFiles = () => {
+    selectedFiles = [];
+    syncFileInput();
+    setFileLimitMessage("");
+    renderSelectedFiles();
+  };
+
+  /**
+   * @param {FileList|File[]} incoming
+   * @param {{ mode?: "replace" | "append" }} [opts]
+   */
+  const applySelectedFiles = (incoming, opts = {}) => {
+    const mode = opts.mode === "append" ? "append" : "replace";
+    const nextIncoming = Array.from(incoming || []).filter(Boolean);
+    let next =
+      mode === "append" ? selectedFiles.slice() : [];
+
+    let truncated = false;
+    for (const file of nextIncoming) {
+      if (next.length >= MAX_QUOTE_FILES) {
+        truncated = true;
+        break;
+      }
+      const dup = next.some(
+        (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified
+      );
+      if (dup) continue;
+      next.push(file);
+    }
+    if (mode === "replace" && nextIncoming.length > MAX_QUOTE_FILES) {
+      truncated = true;
+    }
+
+    selectedFiles = next.slice(0, MAX_QUOTE_FILES);
+    syncFileInput();
+    renderSelectedFiles();
+    setFileLimitMessage(
+      truncated
+        ? `You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`
+        : ""
+    );
+  };
+
   if (dropzone && fileInput) {
-    const setName = (files) => {
-      if (!files?.length) return;
-      dropzone.querySelector("strong").textContent = files[0].name;
-      dropzone.querySelector("span").textContent =
-        "Selected — file name noted on your quote; attach the file in WhatsApp if needed";
-    };
     dropzone.addEventListener("click", () => fileInput.click());
     dropzone.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
@@ -97,11 +227,13 @@
       e.preventDefault();
       dropzone.classList.remove("is-drag");
       if (e.dataTransfer?.files?.length) {
-        fileInput.files = e.dataTransfer.files;
-        setName(e.dataTransfer.files);
+        applySelectedFiles(e.dataTransfer.files, { mode: "append" });
       }
     });
-    fileInput.addEventListener("change", () => setName(fileInput.files));
+    fileInput.addEventListener("change", () => {
+      if (!fileInput.files?.length) return;
+      applySelectedFiles(fileInput.files, { mode: "replace" });
+    });
   }
 
   /* Quote form → POST /api/contact (Brevo email). WhatsApp remains optional secondary UX. */
@@ -125,8 +257,13 @@
       const use = String(fd.get("use") || "").trim();
       const deadline = String(fd.get("deadline") || "").trim();
       const details = String(fd.get("details") || "").trim();
-      const picked = form.querySelector("#file-input")?.files?.[0];
-      const fileName = picked?.name || "";
+      const filesMeta = selectedFiles.map((file) => ({
+        name: file.name,
+        size: file.size,
+        type: file.type || "",
+      }));
+      const fileNames = filesMeta.map((f) => f.name);
+      const fileName = fileNames.join(", ");
 
       const showStatus = (html, ok = true) => {
         if (!note) return;
@@ -150,8 +287,15 @@
         `Deadline: ${deadline || "—"}`,
         `Details: ${details || "—"}`,
       ];
-      if (fileName) {
-        lines.push(`Selected file (please attach in chat): ${fileName}`);
+      if (fileNames.length) {
+        lines.push(
+          `Selected files (please attach in chat): ${fileNames
+            .map((n, i) => {
+              const size = formatFileSize(filesMeta[i].size);
+              return size ? `${n} (${size})` : n;
+            })
+            .join(", ")}`
+        );
       }
       const waBody = lines.join("\n");
       const waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(waBody)}`;
@@ -162,6 +306,8 @@
         use,
         deadline,
         message: details,
+        files: filesMeta,
+        fileNames,
         fileName,
         timestamp: new Date().toISOString(),
       };
@@ -195,15 +341,26 @@
         }
 
         if (typeof window.trackEvent === "function") {
-          window.trackEvent("generate_lead", {
+          /* Primary conversion events for GTM / Google Ads.
+             email (and phone if ever added) are plain text for Enhanced Conversions
+             mapping in GTM — Google’s tag hashes; do not invent client hashing here. */
+          const leadPayload = {
+            form_name: "contact_quote",
             method: "quote_form",
+            email: email || undefined,
+            phone: String(fd.get("phone") || "").trim() || undefined,
             use: use || undefined,
-            has_file: Boolean(fileName),
-          });
+            has_file: fileNames.length > 0,
+            file_count: fileNames.length,
+          };
+          window.trackEvent("quote_submit_success", leadPayload);
+          window.trackEvent("generate_lead", leadPayload);
         }
 
-        const attachHint = fileName
-          ? ` To send <strong>${escapeHtml(fileName)}</strong>, you can <a href="${waUrl}" target="_blank" rel="noopener noreferrer">attach it on WhatsApp</a>.`
+        const attachHint = fileNames.length
+          ? ` To send <strong>${escapeHtml(
+              fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files`
+            )}</strong>, you can <a href="${waUrl}" target="_blank" rel="noopener noreferrer">attach on WhatsApp</a>.`
           : ` Prefer chat? <a href="${waUrl}" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a>.`;
 
         showStatus(
@@ -211,11 +368,7 @@
           true
         );
         form.reset();
-        if (dropzone && fileInput) {
-          dropzone.querySelector("strong").textContent = "Drag & drop your logo here";
-          dropzone.querySelector("span").textContent =
-            "or click to browse · JPG, PNG, PDF, AI, SVG";
-        }
+        clearSelectedFiles();
       } catch (_) {
         showStatus(
           `Network error — please try again or <a href="${waUrl}" target="_blank" rel="noopener noreferrer">send via WhatsApp</a>.`,
@@ -237,11 +390,7 @@
     float.setAttribute("aria-label", "Chat on WhatsApp");
     float.innerHTML =
       '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.47 14.38c-.3-.15-1.77-.87-2.04-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.48-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.09 1.77-.72 2.02-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.2-.57-.35z"/><path d="M12.04 2C6.5 2 2.02 6.48 2.02 12c0 1.85.5 3.58 1.38 5.07L2 22l5.08-1.33A9.96 9.96 0 0 0 12.04 22C17.56 22 22 17.52 22 12S17.56 2 12.04 2zm0 18.15c-1.67 0-3.22-.5-4.52-1.35l-.32-.2-3.01.79.8-2.94-.21-.33a8.12 8.12 0 0 1-1.25-4.32c0-4.5 3.66-8.15 8.17-8.15 4.5 0 8.15 3.65 8.15 8.15 0 4.5-3.65 8.15-8.15 8.15z"/></svg>';
-    float.addEventListener("click", () => {
-      if (typeof window.trackEvent === "function") {
-        window.trackEvent("cta_click", { label: "WhatsApp float", href: float.href, location: "float" });
-      }
-    });
+    /* whatsapp_click is bound via document delegation in tracking.js */
     document.body.appendChild(float);
   }
 

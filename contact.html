@@ -61,9 +61,11 @@
           <div class="dropzone" role="button" tabindex="0" aria-controls="file-input">
             <strong>Drag &amp; drop your logo here</strong>
             <span>or click to browse · JPG, PNG, PDF, AI, SVG</span>
-            <input id="file-input" type="file" name="logo" accept=".jpg,.jpeg,.png,.pdf,.ai,.svg,.webp" hidden />
+            <input id="file-input" type="file" name="logo" accept=".jpg,.jpeg,.png,.pdf,.ai,.svg,.webp" multiple hidden />
           </div>
-          <p class="form-hint">Optional: select your logo for reference. Your quote is emailed to us when you tap <strong>Get Free Quote</strong>. File transfer isn’t included in the form — you can attach the file in WhatsApp afterward if needed.</p>
+          <ul class="file-list" data-file-list hidden></ul>
+          <p class="form-hint form-hint--file-limit" data-file-limit-msg hidden></p>
+          <p class="form-hint">Optional: you can select up to 5 files for reference. Your quote is emailed to us when you tap <strong>Get Free Quote</strong>. File transfer isn’t included in the form — you can attach the files in WhatsApp afterward if needed.</p>
 
           <div class="form-row">
             <label>Full name

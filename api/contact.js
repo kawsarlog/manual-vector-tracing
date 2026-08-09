@@ -29,9 +29,71 @@ function row(label, value) {
   return `<tr><td style="padding:10px 0;border-bottom:1px solid #1f2937;"><span style="color:#9ca3af;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;">${escapeHtml(label)}</span><br><strong style="color:#111827;font-size:15px;">${display}</strong></td></tr>`;
 }
 
+function formatBytes(bytes) {
+  const n = Number(bytes);
+  if (!Number.isFinite(n) || n < 0) return "";
+  if (n < 1024) return `${Math.round(n)} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(n < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
+}
+
+function normalizeFiles(data) {
+  const out = [];
+  const seen = new Set();
+
+  const pushEntry = (entry) => {
+    if (!entry) return;
+    let name = "";
+    let size = null;
+    let type = "";
+    if (typeof entry === "string") {
+      name = entry.trim();
+    } else if (typeof entry === "object") {
+      name = String(entry.name || entry.fileName || "").trim();
+      const rawSize = entry.size ?? entry.bytes;
+      size = Number.isFinite(Number(rawSize)) ? Number(rawSize) : null;
+      type = String(entry.type || "").trim();
+    }
+    if (!name) return;
+    const key = name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ name, size, type });
+  };
+
+  if (Array.isArray(data.files) && data.files.length) {
+    data.files.forEach(pushEntry);
+  } else if (Array.isArray(data.fileNames) && data.fileNames.length) {
+    data.fileNames.forEach(pushEntry);
+  } else if (data.fileName) {
+    String(data.fileName)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach(pushEntry);
+  }
+
+  return out.slice(0, 5);
+}
+
+function filesRowHtml(files) {
+  if (!files.length) {
+    return row("Selected files", "");
+  }
+  const list = files
+    .map((f) => {
+      const sizeLabel = formatBytes(f.size);
+      const label = sizeLabel ? `${escapeHtml(f.name)} (${escapeHtml(sizeLabel)})` : escapeHtml(f.name);
+      return `<li style="margin:0 0 4px;">${label}</li>`;
+    })
+    .join("");
+  return `<tr><td style="padding:10px 0;border-bottom:1px solid #1f2937;"><span style="color:#9ca3af;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;">Selected files (${files.length})</span><br><ul style="margin:8px 0 0;padding-left:1.15rem;color:#111827;font-size:15px;font-weight:600;line-height:1.45;">${list}</ul></td></tr>`;
+}
+
 function buildHtml(payload) {
   const messageHtml = escapeHtml(payload.message || "").replace(/\n/g, "<br>");
   const stamped = escapeHtml(payload.timestamp || new Date().toISOString());
+  const files = Array.isArray(payload.files) ? payload.files : [];
 
   return `
 <html>
@@ -56,7 +118,7 @@ function buildHtml(payload) {
                   ${row("Phone", payload.phone)}
                   ${row("Intended use", payload.use)}
                   ${row("Deadline", payload.deadline)}
-                  ${row("Selected file", payload.fileName)}
+                  ${filesRowHtml(files)}
                   ${row("Timestamp", stamped)}
                 </table>
                 <div style="margin-top:16px;padding:14px;border:1px solid #e5e7eb;background:#f9fafb;">
@@ -146,6 +208,7 @@ module.exports = async function handler(req, res) {
   }
 
   const data = typeof req.body === "object" && req.body ? req.body : {};
+  const files = normalizeFiles(data);
   const fields = {
     name: String(data.name || "").trim(),
     email: String(data.email || "").trim(),
@@ -153,7 +216,9 @@ module.exports = async function handler(req, res) {
     use: String(data.use || "").trim(),
     deadline: String(data.deadline || "").trim(),
     message: String(data.message || data.details || "").trim(),
-    fileName: String(data.fileName || "").trim(),
+    files,
+    fileNames: files.map((f) => f.name),
+    fileName: files.map((f) => f.name).join(", "),
     timestamp: String(data.timestamp || new Date().toISOString()).trim(),
   };
 

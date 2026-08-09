@@ -1453,6 +1453,77 @@ select:focus {
   margin-bottom: 0.25rem;
 }
 
+.file-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.file-list[hidden] {
+  display: none;
+}
+
+.file-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--blue-soft);
+  border: 1px solid #b5d4c2;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.file-list__meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
+}
+
+.file-list__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.file-list__size {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.file-list__remove {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.15rem 0.35rem;
+  line-height: 1.2;
+}
+
+.file-list__remove:hover,
+.file-list__remove:focus-visible {
+  color: var(--danger);
+  outline: none;
+}
+
+.form-hint--file-limit {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .contact-layout {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
