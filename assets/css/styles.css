@@ -31,11 +31,13 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: var(--header-h);
   overflow-x: hidden;
 }
 
 body {
   margin: 0;
+  padding-top: var(--header-h);
   font-family: var(--font-body);
   font-size: 1.0625rem;
   line-height: 1.65;
@@ -218,13 +220,17 @@ p:last-child {
   flex-shrink: 0;
 }
 
-/* Header */
+/* Header — fixed so it stays pinned (sticky fails with overflow-x on html/body) */
 .site-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
   z-index: var(--z-sticky);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
   height: var(--header-h);
 }
@@ -296,7 +302,8 @@ p:last-child {
 }
 
 .nav a:hover,
-.nav a[aria-current="page"] {
+.nav a[aria-current="page"],
+.nav a.is-active {
   color: var(--blue);
   background: var(--blue-soft);
 }
