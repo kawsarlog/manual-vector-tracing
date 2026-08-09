@@ -265,15 +265,18 @@ p:last-child {
 }
 
 .logo__name {
+  display: flex;
+  flex-direction: column;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
   color: var(--ink);
   text-transform: uppercase;
 }
 
-.logo__name span {
+.logo__line--accent {
   color: var(--blue);
 }
 
@@ -282,7 +285,7 @@ p:last-child {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
 }
 
 .nav {
@@ -1111,6 +1114,10 @@ p:last-child {
 
 .site-footer .logo__name {
   color: white;
+}
+
+.site-footer .logo__line--accent {
+  color: var(--blue);
 }
 
 .site-footer .logo__tag {
