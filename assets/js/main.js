@@ -69,7 +69,7 @@
       if (!files?.length) return;
       dropzone.querySelector("strong").textContent = files[0].name;
       dropzone.querySelector("span").textContent =
-        "Selected — attach this file in WhatsApp after you tap Get Free Quote";
+        "Selected — file name noted on your quote; attach the file in WhatsApp if needed";
     };
     dropzone.addEventListener("click", () => fileInput.click());
     dropzone.addEventListener("keydown", (e) => {
@@ -94,11 +94,10 @@
     fileInput.addEventListener("change", () => setName(fileInput.files));
   }
 
-  /* Quote form → WhatsApp (prefilled) with mailto fallback. Files can’t go via wa.me. */
+  /* Quote form → POST /api/contact (Brevo email). WhatsApp remains optional secondary UX. */
   const form = document.querySelector("[data-quote-form]");
   if (form) {
     const WA_E164 = "8801685844099";
-    const QUOTE_EMAIL = "hello@manualvectortracing.com";
     const escapeHtml = (s) =>
       String(s)
         .replace(/&/g, "&amp;")
@@ -106,9 +105,10 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const note = form.querySelector("[data-form-status]");
+      const submitBtn = form.querySelector('button[type="submit"]');
       const fd = new FormData(form);
       const name = String(fd.get("name") || "").trim();
       const email = String(fd.get("email") || "").trim();
@@ -132,7 +132,7 @@
       }
 
       const lines = [
-        "Free vector quote request",
+        "Free vector quote request (Manual Vector Tracing)",
         "",
         `Name: ${name}`,
         `Email: ${email}`,
@@ -143,51 +143,81 @@
       if (fileName) {
         lines.push(`Selected file (please attach in chat): ${fileName}`);
       }
-      const body = lines.join("\n");
+      const waBody = lines.join("\n");
+      const waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(waBody)}`;
 
-      if (typeof window.trackEvent === "function") {
-        window.trackEvent("generate_lead", {
-          method: "quote_form",
-          use: use || undefined,
-          has_file: Boolean(fileName),
-        });
-      }
+      const payload = {
+        name,
+        email,
+        use,
+        deadline,
+        message: details,
+        fileName,
+        timestamp: new Date().toISOString(),
+      };
 
-      const waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(body)}`;
-      const mailtoUrl =
-        `mailto:${QUOTE_EMAIL}` +
-        `?subject=${encodeURIComponent("Free vector quote request")}` +
-        `&body=${encodeURIComponent(body)}`;
+      if (submitBtn) submitBtn.disabled = true;
+      showStatus("Sending your quote request…", true);
 
-      const attachHint = fileName
-        ? ` Attach <strong>${escapeHtml(fileName)}</strong> in the WhatsApp chat — file upload can’t travel through the link.`
-        : ` After chat opens, attach your logo file there (files can’t travel through the WhatsApp link).`;
-
-      let opened = null;
       try {
-        opened = window.open(waUrl, "_blank", "noopener,noreferrer");
-      } catch (_) {
-        opened = null;
-      }
+        const res = await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (!opened) {
-        window.location.href = mailtoUrl;
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (_) {
+          data = null;
+        }
+
+        if (!res.ok || !data || data.status !== "success") {
+          const msg =
+            (data && data.message) ||
+            "We couldn’t send your quote right now. Please try again or message us on WhatsApp.";
+          showStatus(
+            `${escapeHtml(msg)} <a href="${waUrl}" target="_blank" rel="noopener noreferrer">Open WhatsApp instead</a>.`,
+            false
+          );
+          return;
+        }
+
+        if (typeof window.trackEvent === "function") {
+          window.trackEvent("generate_lead", {
+            method: "quote_form",
+            use: use || undefined,
+            has_file: Boolean(fileName),
+          });
+        }
+
+        const attachHint = fileName
+          ? ` To send <strong>${escapeHtml(fileName)}</strong>, you can <a href="${waUrl}" target="_blank" rel="noopener noreferrer">attach it on WhatsApp</a>.`
+          : ` Prefer chat? <a href="${waUrl}" target="_blank" rel="noopener noreferrer">Message us on WhatsApp</a>.`;
+
         showStatus(
-          `WhatsApp didn’t open (often blocked by the browser). Your email app should open with the same details — or <a href="${waUrl}" target="_blank" rel="noopener noreferrer">open WhatsApp manually</a>.${attachHint}`,
+          `Thanks${name ? `, ${escapeHtml(name)}` : ""} — your quote request was emailed to us. We’ll reply soon.${attachHint}`,
           true
         );
-        return;
+        form.reset();
+        if (dropzone && fileInput) {
+          dropzone.querySelector("strong").textContent = "Drag & drop your logo here";
+          dropzone.querySelector("span").textContent =
+            "or click to browse · JPG, PNG, PDF, AI, SVG";
+        }
+      } catch (_) {
+        showStatus(
+          `Network error — please try again or <a href="${waUrl}" target="_blank" rel="noopener noreferrer">send via WhatsApp</a>.`,
+          false
+        );
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
-
-      showStatus(
-        `Thanks${name ? `, ${escapeHtml(name)}` : ""} — WhatsApp is opening with your quote details.${attachHint}` +
-          ` If nothing opens, <a href="${mailtoUrl}">email us instead</a>.`,
-        true
-      );
     });
   }
 
-  /* Modest floating WhatsApp control (P1 contact reachability; site blue + WA icon) */
+  /* Modest floating WhatsApp control (P1 contact reachability; site green + WA icon) */
   if (!document.querySelector(".wa-float")) {
     const float = document.createElement("a");
     float.className = "wa-float";

@@ -2,22 +2,22 @@
 
 ## Visual theme
 
-Clean precision studio: light workspace surfaces, ink-dark type, committed royal-blue accent from the logo pen tool. Feels like a soft-proof desk under even studio light — calm, exact, production-trusted. Not dark-mode SaaS; not cream editorial.
+Clean precision studio: light workspace surfaces, ink-dark type, committed green accent. Feels like a soft-proof desk under even studio light — calm, exact, production-trusted. Not dark-mode SaaS; not cream editorial.
 
 ## Color (OKLCH + hex anchors)
 
 | Token | OKLCH | Hex | Role |
 |-------|-------|-----|------|
-| `--ink` | oklch(0.18 0.02 250) | `#0A1218` | Primary text, footer, dark bars |
+| `--ink` | oklch(0.21 0.03 255) | `#111827` | Primary text, footer, dark bars |
 | `--ink-soft` | oklch(0.38 0.02 250) | `#3A4550` | Secondary body |
-| `--blue` | oklch(0.52 0.22 260) | `#0048D4` | Brand accent / CTAs / emphasis |
-| `--blue-deep` | oklch(0.42 0.20 260) | `#0038B0` | CTA hover |
-| `--blue-soft` | oklch(0.94 0.03 260) | `#E8F0FE` | Soft fills, trust pills |
+| `--blue` | oklch(0.55 0.14 150) | `#159447` | Brand accent / CTAs / emphasis |
+| `--blue-deep` | oklch(0.47 0.13 150) | `#117A3A` | CTA hover |
+| `--blue-soft` | oklch(0.96 0.03 150) | `#E7F6EE` | Soft fills, trust pills |
 | `--surface` | oklch(0.99 0.005 250) | `#F7F9FC` | Alternating section bg |
 | `--white` | oklch(1 0 0) | `#FFFFFF` | Main canvas |
 | `--line` | oklch(0.90 0.01 250) | `#E2E8F0` | Hairline borders |
 
-Accent usage: committed (~15–25% of interactive/emphasis surface), not an all-blue drench.
+Accent usage: committed (~15–25% of interactive/emphasis surface), not an all-green drench.
 
 ## Typography
 
