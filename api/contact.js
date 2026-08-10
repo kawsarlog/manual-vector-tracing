@@ -7,7 +7,7 @@
  *   RFQ_FROM_EMAIL    (optional) — verified Brevo sender (default: updates.from.kawsar@gmail.com)
  *   RFQ_FROM_NAME     (optional) — default: Manual Vector Tracing
  *
- * Quote TO is hardcoded to hello@rsgraphicdesign.com (RFQ_TO_EMAIL is ignored).
+ * Quote TO is hardcoded to rsstudiobd@gmail.com (RFQ_TO_EMAIL is ignored).
  */
 
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
@@ -211,7 +211,7 @@ async function sendViaBrevo(payload) {
   const sender = (process.env.RFQ_FROM_EMAIL || "updates.from.kawsar@gmail.com").trim();
   const senderName = (process.env.RFQ_FROM_NAME || "Manual Vector Tracing").trim();
   // Hardcoded — do not use RFQ_TO_EMAIL (missing/wrong env must not break delivery).
-  const recipient = "hello@rsgraphicdesign.com";
+  const recipient = "rsstudiobd@gmail.com";
   const recipientName = "Sales Team";
   const subjectName = payload.name || payload.email || "website visitor";
   const subject = `[Manual Vector Tracing] New quote request from ${subjectName}`;

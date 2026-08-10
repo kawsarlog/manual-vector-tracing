@@ -169,6 +169,6 @@ http
     console.log(`contact http://${HOST}:${PORT}/contact.html`);
     console.log(`thanks  http://${HOST}:${PORT}/thanks.html`);
     console.log(`Brevo key: ${keyOk ? "loaded" : "MISSING"}`);
-    console.log(`RFQ_TO: hello@rsgraphicdesign.com (hardcoded)`);
+    console.log(`RFQ_TO: rsstudiobd@gmail.com (hardcoded)`);
     console.log(`RFQ_FROM_EMAIL: ${from}`);
   });
