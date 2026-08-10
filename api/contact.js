@@ -137,9 +137,17 @@ function filesRowHtml(files) {
 }
 
 function buildHtml(payload) {
-  const messageHtml = escapeHtml(payload.message || "").replace(/\n/g, "<br>");
+  const message = String(payload.message || "").trim();
+  const messageHtml = escapeHtml(message).replace(/\n/g, "<br>");
   const stamped = escapeHtml(payload.timestamp || new Date().toISOString());
   const files = Array.isArray(payload.files) ? payload.files : [];
+  const name = String(payload.name || "").trim();
+  const messageBlock = message
+    ? `<div style="margin-top:16px;padding:14px;border:1px solid #e5e7eb;background:#f9fafb;">
+                  <div style="color:#159447;font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Message / details</div>
+                  <div style="color:#111827;font-size:14px;line-height:1.65;">${messageHtml}</div>
+                </div>`
+    : "";
 
   return `
 <html>
@@ -159,17 +167,12 @@ function buildHtml(payload) {
               <td style="padding:18px 24px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
                   ${row("Source website", "https://manualvectortracing.com")}
-                  ${row("Name", payload.name)}
+                  ${name ? row("Name", name) : ""}
                   ${row("Email", payload.email)}
-                  ${payload.use ? row("Intended use", payload.use) : ""}
-                  ${payload.deadline ? row("Deadline", payload.deadline) : ""}
                   ${filesRowHtml(files)}
                   ${row("Timestamp", stamped)}
                 </table>
-                <div style="margin-top:16px;padding:14px;border:1px solid #e5e7eb;background:#f9fafb;">
-                  <div style="color:#159447;font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Message / details</div>
-                  <div style="color:#111827;font-size:14px;line-height:1.65;">${messageHtml || "—"}</div>
-                </div>
+                ${messageBlock}
                 <p style="margin:18px 0 0;font-size:12px;color:#6b7280;line-height:1.5;">
                   This message was sent from the Manual Vector Tracing contact/quote form.
                   Reply directly to the submitter (${escapeHtml(payload.email)}).
@@ -290,8 +293,6 @@ module.exports = async function handler(req, res) {
   const fields = {
     name: String(data.name || "").trim(),
     email: String(data.email || "").trim(),
-    use: String(data.use || "").trim(),
-    deadline: String(data.deadline || "").trim(),
     message: String(data.message || data.details || "").trim(),
     files,
     fileNames: files.map((f) => f.name),

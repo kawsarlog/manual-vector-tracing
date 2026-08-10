@@ -403,8 +403,6 @@
         const payload = {
           name,
           email,
-          use: "",
-          deadline: "",
           message: details,
           files: filesMeta,
           fileNames,
