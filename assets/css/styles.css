@@ -220,6 +220,20 @@ p:last-child {
   flex-shrink: 0;
 }
 
+.cta-short {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .cta-full {
+    display: none;
+  }
+
+  .cta-short {
+    display: inline;
+  }
+}
+
 /* Header — fixed so it stays pinned (sticky fails with overflow-x on html/body) */
 .site-header {
   position: fixed;
@@ -1066,10 +1080,29 @@ p:last-child {
   content: "–";
 }
 
-.faq details p {
+.faq details p,
+.faq details ul,
+.faq details ol {
   margin-top: 0.7rem;
   color: var(--ink-soft);
   font-size: 0.98rem;
+}
+
+.faq details p + p,
+.faq details p + ul,
+.faq details p + ol,
+.faq details ul + p,
+.faq details ol + p {
+  margin-top: 0.55rem;
+}
+
+.faq details ul,
+.faq details ol {
+  padding-left: 1.25rem;
+}
+
+.faq details li + li {
+  margin-top: 0.3rem;
 }
 
 /* CTA band */
@@ -1765,7 +1798,7 @@ select:focus {
     padding: 0.45rem 0.75rem;
     font-size: 0.78rem;
     line-height: 1.15;
-    max-width: min(11.5rem, 42vw);
+    max-width: none;
     white-space: nowrap;
   }
 
