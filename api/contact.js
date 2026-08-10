@@ -161,8 +161,8 @@ function buildHtml(payload) {
                   ${row("Source website", "https://manualvectortracing.com")}
                   ${row("Name", payload.name)}
                   ${row("Email", payload.email)}
-                  ${row("Intended use", payload.use)}
-                  ${row("Deadline", payload.deadline)}
+                  ${payload.use ? row("Intended use", payload.use) : ""}
+                  ${payload.deadline ? row("Deadline", payload.deadline) : ""}
                   ${filesRowHtml(files)}
                   ${row("Timestamp", stamped)}
                 </table>
@@ -213,14 +213,15 @@ async function sendViaBrevo(payload) {
   // Hardcoded — do not use RFQ_TO_EMAIL (missing/wrong env must not break delivery).
   const recipient = "hello@rsgraphicdesign.com";
   const recipientName = "Sales Team";
-  const subject = `[Manual Vector Tracing] New quote request from ${payload.name}`;
+  const subjectName = payload.name || payload.email || "website visitor";
+  const subject = `[Manual Vector Tracing] New quote request from ${subjectName}`;
   const attachments = buildAttachments(payload.files);
 
   const body = {
     sender: { name: senderName, email: sender },
     to: [{ email: recipient, name: recipientName }],
     subject,
-    replyTo: { email: payload.email, name: payload.name },
+    replyTo: { email: payload.email, name: payload.name || payload.email },
     htmlContent: buildHtml(payload),
   };
 
@@ -298,13 +299,18 @@ module.exports = async function handler(req, res) {
     timestamp: String(data.timestamp || new Date().toISOString()).trim(),
   };
 
-  if (!fields.name || !fields.email) {
-    res.status(400).json({ status: "error", message: "Name and email are required." });
+  if (!fields.email) {
+    res.status(400).json({ status: "error", message: "Email is required." });
     return;
   }
 
   if (!isValidEmail(fields.email)) {
     res.status(400).json({ status: "error", message: "Please enter a valid email address." });
+    return;
+  }
+
+  if (!fields.files.length) {
+    res.status(400).json({ status: "error", message: "Please upload at least one logo file." });
     return;
   }
 

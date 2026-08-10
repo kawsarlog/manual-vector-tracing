@@ -189,8 +189,9 @@
     const hint = dropzone.querySelector("span");
     if (!title || !hint) return;
     if (!selectedFiles.length) {
-      title.textContent = "Drag & drop your logo here";
-      hint.textContent = "or click to browse · JPG, PNG, PDF, AI, SVG";
+      title.textContent = "JPG, PNG, PDF, screenshots & scans accepted";
+      hint.textContent =
+        "Have an AI, EPS, or SVG file that needs cleanup? You can upload that too.";
       return;
     }
     const count = selectedFiles.length;
@@ -317,7 +318,7 @@
   /* Quote form → POST /api/contact (Brevo email). WhatsApp remains optional secondary UX. */
   const form = document.querySelector("[data-quote-form]");
   if (form) {
-    const WA_E164 = "8801685844099";
+    const WA_E164 = "8801999966382";
     const escapeHtml = (s) =>
       String(s)
         .replace(/&/g, "&amp;")
@@ -332,8 +333,6 @@
       const fd = new FormData(form);
       const name = String(fd.get("name") || "").trim();
       const email = String(fd.get("email") || "").trim();
-      const use = String(fd.get("use") || "").trim();
-      const deadline = String(fd.get("deadline") || "").trim();
       const details = String(fd.get("details") || "").trim();
 
       const showStatus = (html, ok = true) => {
@@ -344,27 +343,25 @@
         note.innerHTML = html;
       };
 
-      if (!name || !email) {
-        showStatus("Please enter your name and email so we can reply.", false);
+      if (!selectedFiles.length) {
+        showStatus("Please upload at least one logo file.", false);
+        return;
+      }
+
+      if (!email) {
+        showStatus("Please enter your email so we can reply.", false);
         return;
       }
 
       if (submitBtn) submitBtn.disabled = true;
-      showStatus(
-        selectedFiles.length
-          ? "Preparing files and sending your quote request…"
-          : "Sending your quote request…",
-        true
-      );
+      showStatus("Preparing files and sending your quote request…", true);
 
       const fallbackWaUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(
         [
           "Free vector quote request (Manual Vector Tracing)",
           "",
-          `Name: ${name}`,
+          `Name: ${name || "—"}`,
           `Email: ${email}`,
-          `Intended use: ${use || "—"}`,
-          `Deadline: ${deadline || "—"}`,
           `Details: ${details || "—"}`,
         ].join("\n")
       )}`;
@@ -378,10 +375,8 @@
         const lines = [
           "Free vector quote request (Manual Vector Tracing)",
           "",
-          `Name: ${name}`,
+          `Name: ${name || "—"}`,
           `Email: ${email}`,
-          `Intended use: ${use || "—"}`,
-          `Deadline: ${deadline || "—"}`,
           `Details: ${details || "—"}`,
         ];
         if (fileNames.length) {
@@ -408,8 +403,8 @@
         const payload = {
           name,
           email,
-          use,
-          deadline,
+          use: "",
+          deadline: "",
           message: details,
           files: filesMeta,
           fileNames,
@@ -449,7 +444,6 @@
             form_name: "contact_quote",
             method: "quote_form",
             email: email || undefined,
-            use: use || undefined,
             has_file: fileNames.length > 0,
             file_count: fileNames.length,
           };
@@ -477,7 +471,7 @@
   if (!document.querySelector(".wa-float")) {
     const float = document.createElement("a");
     float.className = "wa-float";
-    float.href = "https://wa.me/8801685844099";
+    float.href = "https://wa.me/8801999966382";
     float.target = "_blank";
     float.rel = "noopener noreferrer";
     float.setAttribute("aria-label", "Chat on WhatsApp");
