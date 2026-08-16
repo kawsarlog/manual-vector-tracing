@@ -69,7 +69,7 @@
 
     window.addEventListener("resize", syncImgWidth);
     syncImgWidth();
-    setPos(52);
+    setPos(range ? Number(range.value) : 50);
   }
 
   const MAX_QUOTE_FILES = 5;
@@ -493,6 +493,58 @@
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
     );
     items.forEach((el) => io.observe(el));
+  }
+
+  /* Trust strip: count up once when scrolled into view */
+  const trustSection = document.querySelector(".trust");
+  if (trustSection) {
+    const counters = [...trustSection.querySelectorAll("[data-count]")];
+    const formatTrustCount = (el, value) => {
+      const n = Math.round(value);
+      const suffix = el.dataset.suffix ?? "+";
+      const formatted =
+        el.dataset.format === "comma" ? n.toLocaleString("en-US") : String(n);
+      el.textContent = `${formatted}${suffix}`;
+    };
+    const setFinalCounts = () => {
+      counters.forEach((el) => formatTrustCount(el, Number(el.dataset.count) || 0));
+    };
+
+    if (!counters.length) {
+      /* nothing to animate */
+    } else if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setFinalCounts();
+    } else {
+      const DURATION_MS = 1400;
+      const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+      counters.forEach((el) => formatTrustCount(el, 0));
+
+      const runCountUp = () => {
+        const start = performance.now();
+        const targets = counters.map((el) => Number(el.dataset.count) || 0);
+
+        const tick = (now) => {
+          const t = Math.min(1, (now - start) / DURATION_MS);
+          const eased = easeOutQuart(t);
+          counters.forEach((el, i) => formatTrustCount(el, targets[i] * eased));
+          if (t < 1) requestAnimationFrame(tick);
+          else setFinalCounts();
+        };
+        requestAnimationFrame(tick);
+      };
+
+      const trustIo = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            runCountUp();
+            trustIo.unobserve(entry.target);
+          });
+        },
+        { threshold: 0.4, rootMargin: "0px 0px -6% 0px" }
+      );
+      trustIo.observe(trustSection);
+    }
   }
 
   /* Scroll spy: highlight in-page nav links on the home page only */

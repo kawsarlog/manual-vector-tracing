@@ -279,7 +279,7 @@ p:last-child {
 }
 
 .site-footer .logo img {
-  height: 44px;
+  height: 54px;
 }
 
 .nav {
@@ -423,8 +423,11 @@ p:last-child {
 
 .ba__labels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) prevents min-content text from blowing past 50% */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
+  /* Continuous split kills the 1px white seam from subpixel rounding */
+  background: linear-gradient(to right, #eef1f4 50%, var(--blue) 50%);
   font-family: var(--font-display);
   font-size: 0.72rem;
   font-weight: 700;
@@ -433,17 +436,17 @@ p:last-child {
 }
 
 .ba__labels span {
+  min-width: 0;
   padding: 0.65rem 1rem;
   text-align: center;
+  background: transparent;
 }
 
 .ba__labels span:first-child {
-  background: #eef1f4;
   color: var(--ink-soft);
 }
 
 .ba__labels span:last-child {
-  background: var(--blue);
   color: var(--white);
 }
 
@@ -454,6 +457,7 @@ p:last-child {
   cursor: ew-resize;
   user-select: none;
   touch-action: none;
+  overflow: hidden;
 }
 
 .ba__layer {
@@ -469,7 +473,8 @@ p:last-child {
 .ba__layer--before {
   z-index: 2;
   width: 50%;
-  border-right: 2px solid var(--blue);
+  /* Divider is drawn on the handle so it stays centered on the split % */
+  border-right: none;
 }
 
 .ba__photo {
@@ -508,6 +513,20 @@ p:last-child {
   display: grid;
   place-items: center;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+/* Full-height split line, centered on the same left % as the handle */
+.ba__handle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 200vmax;
+  transform: translate(-50%, -50%);
+  background: var(--blue);
+  z-index: -1;
   pointer-events: none;
 }
 
@@ -582,6 +601,7 @@ p:last-child {
   font-weight: 700;
   line-height: 1.1;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .trust__item span {
@@ -2059,7 +2079,7 @@ select:focus {
   }
 
   .site-footer .logo img {
-    height: 36px;
+    height: 44px;
   }
 
   .eyebrow {
