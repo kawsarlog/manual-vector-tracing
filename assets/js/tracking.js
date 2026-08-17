@@ -1,7 +1,8 @@
 /**
- * Conversion / GTM dataLayer tracking — Manual Vector Tracing
+ * Conversion / GA4 + dataLayer tracking — Manual Vector Tracing
  *
- * Event names for GTM Custom Event triggers (real actions only; not pageview-as-conversion):
+ * GA4 measurement ID is loaded via gtag.js on each page (G-SYKYBT4W8J).
+ * Events are also pushed to dataLayer for GTM if a container is added later.
  *
  *   Primary (Ads primary conversion candidates):
  *     - quote_submit_success
@@ -14,23 +15,28 @@
  *     - email_click
  *     - phone_click
  *
- * GTM bootstrap:
- *   Leave empty until you have a real container ID (do not invent GTM-XXXX / AW- IDs).
+ * GTM bootstrap (optional, in addition to GA4):
  *   Set either:  window.MVT_GTM_ID = 'GTM-XXXXXXX';
  *   or:          <meta name="gtm-id" content="GTM-XXXXXXX">
- *   When non-empty, this file injects the standard gtm.js snippet.
- *
- * Enhanced Conversions:
- *   On successful quote submit, email (and phone if present) are pushed on the same
- *   dataLayer hits as plain fields. Enable Enhanced Conversions in GTM / Google Ads;
- *   Google’s tag hashes user data — do not invent client-side hashing here.
  *
  * Debug: window.__TRACKING_VERBOSE__ = true
  */
 (function () {
   window.dataLayer = window.dataLayer || [];
-  /** @type {string} Set later to a real container ID, e.g. 'GTM-XXXXXXX' */
+  /** @type {string} Set later to a real GTM container ID, e.g. 'GTM-XXXXXXX' */
   window.MVT_GTM_ID = window.MVT_GTM_ID || "";
+
+  /**
+   * GA4 event params must not include raw email/phone.
+   * @param {Record<string, unknown>} [payload]
+   */
+  function gtagSafeParams(payload) {
+    const out = Object.assign({}, payload || {});
+    delete out.email;
+    delete out.phone;
+    delete out.user_data;
+    return out;
+  }
 
   /**
    * @param {string} name
@@ -39,6 +45,9 @@
   function trackEvent(name, payload) {
     const data = Object.assign({ event: name }, payload || {});
     window.dataLayer.push(data);
+    if (typeof window.gtag === "function") {
+      window.gtag("event", name, gtagSafeParams(payload));
+    }
     if (window.__TRACKING_VERBOSE__) {
       console.info("[trackEvent]", name, payload || {});
     }
