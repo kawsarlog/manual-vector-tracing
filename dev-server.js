@@ -3,7 +3,7 @@
  * Serves the site and mounts POST /api/contact using api/contact.js + .env.
  *
  *   node dev-server.js
- *   → http://127.0.0.1:8766/contact.html
+ *   → http://127.0.0.1:8766/contact
  */
 const http = require("http");
 const fs = require("fs");
@@ -134,6 +134,11 @@ async function handleContact(req, res) {
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
   if (urlPath === "/") urlPath = "/index.html";
+  else if (!path.extname(urlPath)) {
+    const asHtml = `${urlPath.replace(/\/$/, "")}.html`;
+    const htmlFile = path.join(root, asHtml.replace(/^\//, ""));
+    if (fs.existsSync(htmlFile)) urlPath = asHtml;
+  }
   const file = path.normalize(path.join(root, urlPath.replace(/^\//, "")));
   if (!file.startsWith(root)) {
     res.writeHead(403);
@@ -166,9 +171,9 @@ http
     const from = process.env.RFQ_FROM_EMAIL || "updates.from.kawsar@gmail.com";
     const keyOk = Boolean((process.env.BREVO_API_KEY || "").trim());
     console.log(`ready http://${HOST}:${PORT}`);
-    console.log(`contact http://${HOST}:${PORT}/contact.html`);
-    console.log(`thanks  http://${HOST}:${PORT}/thanks.html`);
+    console.log(`contact http://${HOST}:${PORT}/contact`);
+    console.log(`thanks  http://${HOST}:${PORT}/thanks`);
     console.log(`Brevo key: ${keyOk ? "loaded" : "MISSING"}`);
-    console.log(`RFQ_TO: rsstudiobd@gmail.com (hardcoded)`);
+    console.log(`RFQ_TO: quote@manualvectortracing.com (hardcoded)`);
     console.log(`RFQ_FROM_EMAIL: ${from}`);
   });

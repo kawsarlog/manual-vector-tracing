@@ -15,7 +15,9 @@
  *     - email_click
  *     - phone_click
  *
- * GTM bootstrap (optional, in addition to GA4):
+ * GTM-P487XC2P is installed in each page <head> + <body noscript>.
+ * Do not also set MVT_GTM_ID or GTM will load twice.
+ * Optional extra GTM container:
  *   Set either:  window.MVT_GTM_ID = 'GTM-XXXXXXX';
  *   or:          <meta name="gtm-id" content="GTM-XXXXXXX">
  *

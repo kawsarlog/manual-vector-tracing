@@ -452,7 +452,7 @@
         /* Post-submit thank-you page (dedicated page vs RS in-modal success).
            Fire tracking above before navigating so GTM/Ads still receive the events. */
         const thanksQs = name ? `?name=${encodeURIComponent(name)}` : "";
-        window.location.assign(`thanks.html${thanksQs}`);
+        window.location.assign(`/thanks${thanksQs}`);
         return;
       } catch (_) {
         showStatus(
