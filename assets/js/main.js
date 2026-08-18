@@ -79,7 +79,7 @@
   const MAX_ATTACH_FILE_BYTES = MAX_FILE_BYTES;
   /** Keep total JSON body under Vercel hobby limit (~4.5 MB). Base64 adds ~33%. */
   const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
-  const EMAIL_LIMIT_MSG = "Each file must be 4 MB or smaller — that’s the email limit.";
+  const EMAIL_LIMIT_MSG = "Total file size must stay within 4 MB. Send larger files on WhatsApp.";
   const ALLOWED_EXT = new Set([
     "jpg",
     "jpeg",
@@ -227,13 +227,13 @@
     if (!title || !hint) return;
     if (!selectedFiles.length) {
       title.textContent = "JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG & images";
-      hint.textContent = "Up to 5 files, 4 MB each — that’s the email limit.";
+      hint.textContent = "Optional. Max 5 files, 4 MB total. Larger files: send on WhatsApp.";
       return;
     }
     const count = selectedFiles.length;
     title.textContent =
       count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
-    hint.textContent = "Max 4 MB per file. That’s the email limit.";
+    hint.textContent = "Max 4 MB total. Larger files: send on WhatsApp.";
   };
 
   const renderSelectedFiles = () => {
@@ -333,7 +333,7 @@
       notes.push("Use JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG, or a similar image file.");
     }
     if (rejectedSize) {
-      notes.push("Each file must be 4 MB or smaller, and all files together must stay within 4 MB.");
+      notes.push("Max 4 MB total. Send larger files on WhatsApp.");
     }
     if (truncated) {
       notes.push(`You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`);
@@ -395,18 +395,18 @@
         note.innerHTML = html;
       };
 
-      if (!selectedFiles.length) {
-        showStatus("Please upload at least one logo file.", false);
-        return;
-      }
-
       if (!email) {
         showStatus("Please enter your email so we can reply.", false);
         return;
       }
 
       if (submitBtn) submitBtn.disabled = true;
-      showStatus("Preparing files and sending your quote request…", true);
+      showStatus(
+        selectedFiles.length
+          ? "Preparing files and sending your quote request…"
+          : "Sending your quote request…",
+        true
+      );
 
       const fallbackWaUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(
         [
@@ -421,9 +421,9 @@
 
       try {
         const { files: filesMeta, skippedLarge } = await buildFilesPayload(selectedFiles);
-        if (skippedLarge || filesMeta.some((f) => !f.contentBase64)) {
+        if (skippedLarge) {
           showStatus(
-            `${EMAIL_LIMIT_MSG} Compress the file, or send it to <a href="mailto:info@manualvectortracing.com">info@manualvectortracing.com</a> / <a href="${fallbackWaUrl}" target="_blank" rel="noopener noreferrer">WhatsApp</a>.`,
+            `${EMAIL_LIMIT_MSG} <a href="${fallbackWaUrl}" target="_blank" rel="noopener noreferrer">Open WhatsApp</a>.`,
             false
           );
           return;

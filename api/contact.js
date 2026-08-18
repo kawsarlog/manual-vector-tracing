@@ -310,11 +310,6 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  if (!fields.files.length) {
-    res.status(400).json({ status: "error", message: "Please upload at least one logo file." });
-    return;
-  }
-
   const result = await sendViaBrevo(fields);
   if (!result.ok) {
     res.status(500).json({ status: "error", message: result.message || "Failed to send email." });
