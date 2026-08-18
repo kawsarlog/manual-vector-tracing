@@ -495,57 +495,65 @@
     items.forEach((el) => io.observe(el));
   }
 
-  /* Trust strip: count up once when scrolled into view */
-  const trustSection = document.querySelector(".trust");
-  if (trustSection) {
-    const counters = [...trustSection.querySelectorAll("[data-count]")];
-    const formatTrustCount = (el, value) => {
-      const n = Math.round(value);
-      const suffix = el.dataset.suffix ?? "+";
-      const formatted =
-        el.dataset.format === "comma" ? n.toLocaleString("en-US") : String(n);
-      el.textContent = `${formatted}${suffix}`;
-    };
+  /* Count-up once when a stats group scrolls into view (home, contact, about) */
+  const formatCount = (el, value) => {
+    const n = Math.round(value);
+    const suffix = el.dataset.suffix ?? "+";
+    const formatted =
+      el.dataset.format === "comma" ? n.toLocaleString("en-US") : String(n);
+    el.textContent = `${formatted}${suffix}`;
+  };
+
+  const animateCounters = (root) => {
+    const counters = [...root.querySelectorAll("[data-count]")];
+    if (!counters.length) return;
+
     const setFinalCounts = () => {
-      counters.forEach((el) => formatTrustCount(el, Number(el.dataset.count) || 0));
+      counters.forEach((el) => formatCount(el, Number(el.dataset.count) || 0));
     };
 
-    if (!counters.length) {
-      /* nothing to animate */
-    } else if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setFinalCounts();
-    } else {
-      const DURATION_MS = 1400;
-      const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
-      counters.forEach((el) => formatTrustCount(el, 0));
-
-      const runCountUp = () => {
-        const start = performance.now();
-        const targets = counters.map((el) => Number(el.dataset.count) || 0);
-
-        const tick = (now) => {
-          const t = Math.min(1, (now - start) / DURATION_MS);
-          const eased = easeOutQuart(t);
-          counters.forEach((el, i) => formatTrustCount(el, targets[i] * eased));
-          if (t < 1) requestAnimationFrame(tick);
-          else setFinalCounts();
-        };
-        requestAnimationFrame(tick);
-      };
-
-      const trustIo = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            runCountUp();
-            trustIo.unobserve(entry.target);
-          });
-        },
-        { threshold: 0.4, rootMargin: "0px 0px -6% 0px" }
-      );
-      trustIo.observe(trustSection);
+      return;
     }
-  }
+
+    const DURATION_MS = 1400;
+    const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+    counters.forEach((el) => formatCount(el, 0));
+
+    const runCountUp = () => {
+      const start = performance.now();
+      const targets = counters.map((el) => Number(el.dataset.count) || 0);
+
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / DURATION_MS);
+        const eased = easeOutQuart(t);
+        counters.forEach((el, i) => formatCount(el, targets[i] * eased));
+        if (t < 1) requestAnimationFrame(tick);
+        else setFinalCounts();
+      };
+      requestAnimationFrame(tick);
+    };
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          runCountUp();
+          io.unobserve(entry.target);
+        });
+      },
+      { threshold: 0.35, rootMargin: "0px 0px -6% 0px" }
+    );
+    io.observe(root);
+  };
+
+  const counterRoots = new Set();
+  document.querySelectorAll("[data-count]").forEach((el) => {
+    const root = el.closest("[data-count-root], .trust, .stat-row") || el.parentElement;
+    if (root) counterRoots.add(root);
+  });
+  counterRoots.forEach(animateCounters);
 
   /* Scroll spy: highlight in-page nav links on the home page only */
   const isHomePage = (() => {

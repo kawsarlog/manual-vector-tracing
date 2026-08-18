@@ -174,6 +174,6 @@ http
     console.log(`contact http://${HOST}:${PORT}/contact`);
     console.log(`thanks  http://${HOST}:${PORT}/thanks`);
     console.log(`Brevo key: ${keyOk ? "loaded" : "MISSING"}`);
-    console.log(`RFQ_TO: quote@manualvectortracing.com (hardcoded)`);
+    console.log(`RFQ_TO: info@manualvectortracing.com (hardcoded)`);
     console.log(`RFQ_FROM_EMAIL: ${from}`);
   });
