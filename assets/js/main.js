@@ -73,13 +73,13 @@
   }
 
   const MAX_QUOTE_FILES = 5;
-  /** Hard cap for selecting a file (form still submits; email attach is smaller). */
-  const MAX_FILE_BYTES = 25 * 1024 * 1024;
-  /** Prefer attaching files that fit Vercel ~4.5 MB JSON after base64 (~33% overhead). */
-  const MAX_ATTACH_FILE_BYTES = 3 * 1024 * 1024;
-  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). */
+  /** Email receive cap — files over this never reach the inbox through this form. */
+  const MAX_FILE_BYTES = 4 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+  const MAX_ATTACH_FILE_BYTES = MAX_FILE_BYTES;
+  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). Base64 adds ~33%. */
   const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
-  const TOO_LARGE_NOTE = "too large to attach — use WhatsApp";
+  const EMAIL_LIMIT_MSG = "Each file must be 4 MB or smaller — that’s the email limit.";
   const ALLOWED_EXT = new Set([
     "jpg",
     "jpeg",
@@ -174,7 +174,7 @@
       };
 
       if (!file.size || file.size > MAX_ATTACH_FILE_BYTES) {
-        entry.note = TOO_LARGE_NOTE;
+        entry.note = "too large for email";
         skippedLarge += 1;
         out.push(entry);
         continue;
@@ -185,7 +185,7 @@
         /* Base64 string length ≈ bytes in the JSON body for this field */
         const encodedBytes = contentBase64.length;
         if (encodedBytes > budget) {
-          entry.note = TOO_LARGE_NOTE;
+          entry.note = "too large for email";
           skippedLarge += 1;
           out.push(entry);
           continue;
@@ -193,7 +193,7 @@
         entry.contentBase64 = contentBase64;
         budget -= encodedBytes;
       } catch (_) {
-        entry.note = TOO_LARGE_NOTE;
+        entry.note = "too large for email";
         skippedLarge += 1;
       }
       out.push(entry);
@@ -227,15 +227,13 @@
     if (!title || !hint) return;
     if (!selectedFiles.length) {
       title.textContent = "JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG & images";
-      hint.textContent =
-        "Up to 5 files, 25 MB each. Email attaches about 4 MB total — larger files: send on WhatsApp.";
+      hint.textContent = "Up to 5 files, 4 MB each — that’s the email limit.";
       return;
     }
     const count = selectedFiles.length;
     title.textContent =
       count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
-    hint.textContent =
-      "Email attaches about 4 MB total. Larger files skip attachment — send those on WhatsApp.";
+    hint.textContent = "Max 4 MB per file. That’s the email limit.";
   };
 
   const renderSelectedFiles = () => {
@@ -308,7 +306,8 @@
         rejectedType += 1;
         continue;
       }
-      if (!file.size || file.size > MAX_FILE_BYTES) {
+      const total = next.reduce((sum, f) => sum + (f.size || 0), 0);
+      if (!file.size || file.size > MAX_FILE_BYTES || total + file.size > MAX_TOTAL_BYTES) {
         rejectedSize += 1;
         continue;
       }
@@ -334,7 +333,7 @@
       notes.push("Use JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG, or a similar image file.");
     }
     if (rejectedSize) {
-      notes.push("Each file must be 25 MB or smaller.");
+      notes.push("Each file must be 4 MB or smaller, and all files together must stay within 4 MB.");
     }
     if (truncated) {
       notes.push(`You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`);
@@ -422,6 +421,13 @@
 
       try {
         const { files: filesMeta, skippedLarge } = await buildFilesPayload(selectedFiles);
+        if (skippedLarge || filesMeta.some((f) => !f.contentBase64)) {
+          showStatus(
+            `${EMAIL_LIMIT_MSG} Compress the file, or send it to <a href="mailto:info@manualvectortracing.com">info@manualvectortracing.com</a> / <a href="${fallbackWaUrl}" target="_blank" rel="noopener noreferrer">WhatsApp</a>.`,
+            false
+          );
+          return;
+        }
         const fileNames = filesMeta.map((f) => f.name);
         const fileName = fileNames.join(", ");
 
@@ -437,18 +443,10 @@
             `Selected files: ${fileNames
               .map((n, i) => {
                 const size = formatFileSize(filesMeta[i].size);
-                const tagged = filesMeta[i].contentBase64
-                  ? `${n}${size ? ` (${size})` : ""}`
-                  : `${n}${size ? ` (${size})` : ""} — ${TOO_LARGE_NOTE}`;
-                return tagged;
+                return `${n}${size ? ` (${size})` : ""}`;
               })
               .join(", ")}`
           );
-          if (skippedLarge) {
-            lines.push(
-              `(${skippedLarge} file(s) too large for email attach — please send via WhatsApp)`
-            );
-          }
         }
         const waBody = lines.join("\n");
         waUrl = `https://wa.me/${WA_E164}?text=${encodeURIComponent(waBody)}`;
