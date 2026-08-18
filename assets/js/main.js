@@ -73,11 +73,48 @@
   }
 
   const MAX_QUOTE_FILES = 5;
-  /** Prefer attaching images/PDFs under this size each (~1.5 MB). */
-  const MAX_ATTACH_FILE_BYTES = Math.floor(1.5 * 1024 * 1024);
-  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). Base64 adds ~33%. */
+  /** Hard cap for selecting a file (form still submits; email attach is smaller). */
+  const MAX_FILE_BYTES = 25 * 1024 * 1024;
+  /** Prefer attaching files that fit Vercel ~4.5 MB JSON after base64 (~33% overhead). */
+  const MAX_ATTACH_FILE_BYTES = 3 * 1024 * 1024;
+  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). */
   const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
   const TOO_LARGE_NOTE = "too large to attach — use WhatsApp";
+  const ALLOWED_EXT = new Set([
+    "jpg",
+    "jpeg",
+    "jfif",
+    "png",
+    "gif",
+    "webp",
+    "bmp",
+    "tif",
+    "tiff",
+    "svg",
+    "pdf",
+    "ai",
+    "eps",
+    "psd",
+    "heic",
+    "heif",
+    "avif",
+    "ico",
+  ]);
+
+  const fileExt = (file) => {
+    const name = String(file && file.name ? file.name : "").toLowerCase();
+    const dot = name.lastIndexOf(".");
+    return dot === -1 ? "" : name.slice(dot + 1);
+  };
+
+  const isAllowedQuoteFile = (file) => {
+    const ext = fileExt(file);
+    if (ext && ALLOWED_EXT.has(ext)) return true;
+    const type = String(file && file.type ? file.type : "").toLowerCase();
+    if (type.startsWith("image/")) return true;
+    if (type === "application/pdf" || type === "application/postscript") return true;
+    return false;
+  };
   let selectedFiles = [];
   const dropzone = document.querySelector(".dropzone");
   const fileInput = document.querySelector("#file-input");
@@ -189,16 +226,16 @@
     const hint = dropzone.querySelector("span");
     if (!title || !hint) return;
     if (!selectedFiles.length) {
-      title.textContent = "JPG, PNG, PDF, screenshots & scans accepted";
+      title.textContent = "JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG & images";
       hint.textContent =
-        "Have an AI, EPS, or SVG file that needs cleanup? You can upload that too.";
+        "Up to 5 files, 25 MB each. Email attaches about 4 MB total — larger files: send on WhatsApp.";
       return;
     }
     const count = selectedFiles.length;
     title.textContent =
       count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
     hint.textContent =
-      "Files email as attachments when under size limits (else use WhatsApp)";
+      "Email attaches about 4 MB total. Larger files skip attachment — send those on WhatsApp.";
   };
 
   const renderSelectedFiles = () => {
@@ -264,7 +301,17 @@
       mode === "append" ? selectedFiles.slice() : [];
 
     let truncated = false;
+    let rejectedType = 0;
+    let rejectedSize = 0;
     for (const file of nextIncoming) {
+      if (!isAllowedQuoteFile(file)) {
+        rejectedType += 1;
+        continue;
+      }
+      if (!file.size || file.size > MAX_FILE_BYTES) {
+        rejectedSize += 1;
+        continue;
+      }
       if (next.length >= MAX_QUOTE_FILES) {
         truncated = true;
         break;
@@ -282,11 +329,17 @@
     selectedFiles = next.slice(0, MAX_QUOTE_FILES);
     syncFileInput();
     renderSelectedFiles();
-    setFileLimitMessage(
-      truncated
-        ? `You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`
-        : ""
-    );
+    const notes = [];
+    if (rejectedType) {
+      notes.push("Use JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG, or a similar image file.");
+    }
+    if (rejectedSize) {
+      notes.push("Each file must be 25 MB or smaller.");
+    }
+    if (truncated) {
+      notes.push(`You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`);
+    }
+    setFileLimitMessage(notes.join(" "));
   };
 
   if (dropzone && fileInput) {
