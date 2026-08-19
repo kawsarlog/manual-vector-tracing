@@ -1,8 +1,10 @@
 /**
- * Conversion / GA4 + dataLayer tracking — Manual Vector Tracing
+ * Conversion / dataLayer tracking — Manual Vector Tracing
  *
- * GA4 measurement ID is loaded via gtag.js on each page (G-SYKYBT4W8J).
- * Events are also pushed to dataLayer for GTM if a container is added later.
+ * Custom events go to dataLayer once. GTM-P487XC2P forwards them to GA4
+ * (G-SYKYBT4W8J) and Google Ads. Do not also call gtag("event") here:
+ * the page gtag() helper is itself dataLayer.push, so GTM would record
+ * the same event twice (e.g. whatsapp_click) and conversions double-count.
  *
  *   Primary (Ads primary conversion candidates):
  *     - quote_submit_success
@@ -29,27 +31,12 @@
   window.MVT_GTM_ID = window.MVT_GTM_ID || "";
 
   /**
-   * GA4 event params must not include raw email/phone.
-   * @param {Record<string, unknown>} [payload]
-   */
-  function gtagSafeParams(payload) {
-    const out = Object.assign({}, payload || {});
-    delete out.email;
-    delete out.phone;
-    delete out.user_data;
-    return out;
-  }
-
-  /**
    * @param {string} name
    * @param {Record<string, unknown>} [payload]
    */
   function trackEvent(name, payload) {
     const data = Object.assign({ event: name }, payload || {});
     window.dataLayer.push(data);
-    if (typeof window.gtag === "function") {
-      window.gtag("event", name, gtagSafeParams(payload));
-    }
     if (window.__TRACKING_VERBOSE__) {
       console.info("[trackEvent]", name, payload || {});
     }
