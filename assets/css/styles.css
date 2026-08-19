@@ -1557,6 +1557,11 @@ p:last-child {
   color: var(--ink-soft);
 }
 
+.legal strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 /* Pricing */
 .pricing-grid {
   display: grid;
