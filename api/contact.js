@@ -1,19 +1,27 @@
 ﻿/**
  * Manual Vector Tracing — quote/contact email via Brevo Transactional API.
- * Same provider & pattern as RS Graphic Design (POST https://api.brevo.com/v3/smtp/email).
+ * Artwork files upload to Cloudflare R2; this handler emails download links.
  *
  * Vercel Environment Variables:
- *   BREVO_API_KEY     (required) — Brevo dashboard → SMTP & API → API keys
- *   RFQ_FROM_EMAIL    (optional) — verified Brevo sender (default: updates.from.kawsar@gmail.com)
- *   RFQ_FROM_NAME     (optional) — default: Manual Vector Tracing
+ *   BREVO_API_KEY           (required)
+ *   RFQ_FROM_EMAIL          (optional)
+ *   RFQ_FROM_NAME           (optional)
+ *   R2_ACCOUNT_ID           (required for file links)
+ *   R2_ACCESS_KEY_ID        (required for file links)
+ *   R2_SECRET_ACCESS_KEY    (required for file links)
+ *   R2_BUCKET_NAME          (optional, default manual-vector-tracing)
+ *   SITE_URL                (optional, default https://manualvectortracing.com)
  *
  * Quote TO is hardcoded to info@manualvectortracing.com (RFQ_TO_EMAIL is ignored).
  */
 
+const {
+  isValidQuoteKey,
+  buildPermanentDownloadUrl,
+  MAX_FILES,
+} = require("./lib/r2");
+
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
-const MAX_FILES = 5;
-/** Soft guard so we do not accept huge base64 bodies (Vercel hobby ~4.5 MB). */
-const MAX_ATTACH_CONTENT_CHARS = Math.floor(4 * 1024 * 1024);
 
 function escapeHtml(value) {
   return String(value)
@@ -25,13 +33,6 @@ function escapeHtml(value) {
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function stripDataUrlPrefix(value) {
-  const s = String(value || "");
-  const comma = s.indexOf(",");
-  if (s.startsWith("data:") && comma !== -1) return s.slice(comma + 1);
-  return s;
 }
 
 function row(label, value) {
@@ -48,21 +49,19 @@ function formatBytes(bytes) {
 }
 
 /**
- * Normalize file list from the quote form.
- * Preserves optional contentBase64 (stripped of data: URL prefix) for Brevo attachments.
- * Does not log or return full base64 in error paths.
+ * Normalize file metadata from the quote form (R2 object keys + optional urls).
  */
 function normalizeFiles(data) {
   const out = [];
   const seen = new Set();
-  let totalContentChars = 0;
 
   const pushEntry = (entry) => {
     if (!entry || out.length >= MAX_FILES) return;
     let name = "";
     let size = null;
     let type = "";
-    let contentBase64 = "";
+    let key = "";
+    let url = "";
     let note = "";
     if (typeof entry === "string") {
       name = entry.trim();
@@ -72,30 +71,22 @@ function normalizeFiles(data) {
       size = Number.isFinite(Number(rawSize)) ? Number(rawSize) : null;
       type = String(entry.type || "").trim();
       note = String(entry.note || "").trim();
-      const rawContent = entry.contentBase64 ?? entry.content ?? entry.base64 ?? "";
-      if (rawContent && typeof rawContent === "string") {
-        contentBase64 = stripDataUrlPrefix(rawContent).replace(/\s+/g, "");
-      }
+      key = String(entry.key || "").trim();
+      url = String(entry.url || entry.downloadUrl || "").trim();
     }
     if (!name) return;
-    const key = name.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
+    const dedupe = `${name.toLowerCase()}|${key || url}`;
+    if (seen.has(dedupe)) return;
+    seen.add(dedupe);
 
-    if (contentBase64) {
-      if (
-        contentBase64.length > MAX_ATTACH_CONTENT_CHARS ||
-        totalContentChars + contentBase64.length > MAX_ATTACH_CONTENT_CHARS
-      ) {
-        contentBase64 = "";
-        if (!note) note = "too large to attach — use WhatsApp";
-      } else {
-        totalContentChars += contentBase64.length;
-      }
+    if (key && !isValidQuoteKey(key)) {
+      key = "";
+      if (!note) note = "invalid upload key";
     }
 
     const item = { name, size, type };
-    if (contentBase64) item.contentBase64 = contentBase64;
+    if (key) item.key = key;
+    if (url) item.url = url;
     if (note) item.note = note;
     out.push(item);
   };
@@ -115,6 +106,22 @@ function normalizeFiles(data) {
   return out.slice(0, MAX_FILES);
 }
 
+async function attachDownloadUrls(files) {
+  if (!Array.isArray(files) || !files.length) return files;
+
+  const out = [];
+  for (const f of files) {
+    const next = { ...f };
+    if (f.key && isValidQuoteKey(f.key)) {
+      /* Permanent site link — never expires; /api/download issues a fresh R2 hop on click. */
+      next.url = buildPermanentDownloadUrl(f.key);
+      if (!next.url && !next.note) next.note = "download link unavailable";
+    }
+    out.push(next);
+  }
+  return out;
+}
+
 function filesRowHtml(files) {
   if (!files.length) {
     return row("Selected files", "");
@@ -122,11 +129,17 @@ function filesRowHtml(files) {
   const list = files
     .map((f) => {
       const sizeLabel = formatBytes(f.size);
-      const attached = Boolean(f.contentBase64);
-      const bits = [escapeHtml(f.name)];
+      const bits = [];
+      if (f.url) {
+        bits.push(
+          `<a href="${escapeHtml(f.url)}" style="color:#159447;text-decoration:underline;">${escapeHtml(f.name)}</a>`
+        );
+      } else {
+        bits.push(escapeHtml(f.name));
+      }
       if (sizeLabel) bits.push(`(${escapeHtml(sizeLabel)})`);
-      if (attached) {
-        bits.push("— attached");
+      if (f.url) {
+        bits.push("— download");
       } else if (f.note) {
         bits.push(`— ${escapeHtml(f.note)}`);
       }
@@ -142,12 +155,18 @@ function buildHtml(payload) {
   const stamped = escapeHtml(payload.timestamp || new Date().toISOString());
   const files = Array.isArray(payload.files) ? payload.files : [];
   const name = String(payload.name || "").trim();
+  const linked = files.filter((f) => f.url).length;
   const messageBlock = message
     ? `<div style="margin-top:16px;padding:14px;border:1px solid #e5e7eb;background:#f9fafb;">
                   <div style="color:#159447;font-size:12px;letter-spacing:1px;text-transform:uppercase;font-weight:700;margin-bottom:8px;">Message / details</div>
                   <div style="color:#111827;font-size:14px;line-height:1.65;">${messageHtml}</div>
                 </div>`
     : "";
+
+  const linkNote =
+    linked > 0
+      ? `Artwork download links do not expire. Files are stored in Cloudflare R2 (not attached to this email).`
+      : `Artwork files with download links appear here when the submitter uploaded files.`;
 
   return `
 <html>
@@ -176,7 +195,7 @@ function buildHtml(payload) {
                 <p style="margin:18px 0 0;font-size:12px;color:#6b7280;line-height:1.5;">
                   This message was sent from the Manual Vector Tracing contact/quote form.
                   Reply directly to the submitter (${escapeHtml(payload.email)}).
-                  Artwork files with email attachments appear in this message when size limits allow.
+                  ${linkNote}
                 </p>
               </td>
             </tr>
@@ -188,23 +207,6 @@ function buildHtml(payload) {
 </html>`.trim();
 }
 
-/**
- * Build Brevo attachment array from normalized files that include contentBase64.
- * Images, PDFs, AI, etc. all attach the same way when base64 is present.
- */
-function buildAttachments(files) {
-  if (!Array.isArray(files) || !files.length) return [];
-  const out = [];
-  for (const f of files) {
-    if (!f || !f.contentBase64 || !f.name) continue;
-    out.push({
-      name: String(f.name).slice(0, 200),
-      content: f.contentBase64,
-    });
-  }
-  return out;
-}
-
 async function sendViaBrevo(payload) {
   const apiKey = (process.env.BREVO_API_KEY || "").trim();
   if (!apiKey) {
@@ -213,12 +215,11 @@ async function sendViaBrevo(payload) {
 
   const sender = (process.env.RFQ_FROM_EMAIL || "updates.from.kawsar@gmail.com").trim();
   const senderName = (process.env.RFQ_FROM_NAME || "Manual Vector Tracing").trim();
-  // Hardcoded — do not use RFQ_TO_EMAIL (missing/wrong env must not split delivery).
   const recipient = "info@manualvectortracing.com";
   const recipientName = "Manual Vector Tracing";
   const subjectName = payload.name || payload.email || "website visitor";
   const subject = `[Manual Vector Tracing] New quote request from ${subjectName}`;
-  const attachments = buildAttachments(payload.files);
+  const linked = (payload.files || []).filter((f) => f.url).length;
 
   const body = {
     sender: { name: senderName, email: sender },
@@ -227,10 +228,6 @@ async function sendViaBrevo(payload) {
     replyTo: { email: payload.email, name: payload.name || payload.email },
     htmlContent: buildHtml(payload),
   };
-
-  if (attachments.length) {
-    body.attachment = attachments;
-  }
 
   let response;
   try {
@@ -248,7 +245,7 @@ async function sendViaBrevo(payload) {
   }
 
   if (response.ok) {
-    return { ok: true, message: "", attached: attachments.length };
+    return { ok: true, message: "", linked };
   }
 
   let detail = "";
@@ -281,12 +278,12 @@ module.exports = async function handler(req, res) {
   }
 
   const data = typeof req.body === "object" && req.body ? req.body : {};
-  const files = normalizeFiles(data);
-  const attachCount = files.filter((f) => f.contentBase64).length;
-  /* Log counts only — never full base64 */
+  let files = normalizeFiles(data);
+  files = await attachDownloadUrls(files);
+  const linkedCount = files.filter((f) => f.url).length;
   if (files.length) {
     console.log(
-      `[contact] files=${files.length} attachable=${attachCount} names=${files.map((f) => f.name).join(", ")}`
+      `[contact] files=${files.length} linked=${linkedCount} names=${files.map((f) => f.name).join(", ")}`
     );
   }
 
@@ -316,5 +313,5 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  res.status(200).json({ status: "success", attached: result.attached || 0 });
+  res.status(200).json({ status: "success", linked: result.linked || 0 });
 };

@@ -1,9 +1,13 @@
 ﻿/**
- * Local static + contact API server for mail testing.
- * Serves the site and mounts POST /api/contact using api/contact.js + .env.
+ * Local static + contact API server for mail / R2 upload testing.
+ * Serves the site and mounts:
+ *   POST /api/contact
+ *   POST /api/upload-url
  *
  *   node dev-server.js
  *   → http://127.0.0.1:8766/contact
+ *
+ * R2 CORS must allow http://127.0.0.1:8766 (or localhost:8766) for browser PUT.
  */
 const http = require("http");
 const fs = require("fs");
@@ -56,6 +60,8 @@ loadEnvFile(path.join(root, ".env.local"));
 loadEnvFile(path.join(root, ".env"));
 
 const contactHandler = require(path.join(root, "api", "contact.js"));
+const uploadUrlHandler = require(path.join(root, "api", "upload-url.js"));
+const downloadHandler = require(path.join(root, "api", "download.js"));
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -103,7 +109,7 @@ function wrapRes(res) {
   };
 }
 
-async function handleContact(req, res) {
+async function handleApi(req, res, handler, label) {
   const wrapped = wrapRes(res);
   try {
     if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
@@ -122,9 +128,9 @@ async function handleContact(req, res) {
     } else {
       req.body = {};
     }
-    await contactHandler(req, wrapped);
+    await handler(req, wrapped);
   } catch (err) {
-    console.error("[dev-server] /api/contact error:", err);
+    console.error(`[dev-server] ${label} error:`, err);
     if (!res.headersSent) {
       wrapped.status(500).json({ status: "error", message: "Local API handler failed." });
     }
@@ -158,7 +164,15 @@ http
   .createServer((req, res) => {
     const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
     if (urlPath === "/api/contact") {
-      handleContact(req, res);
+      handleApi(req, res, contactHandler, "/api/contact");
+      return;
+    }
+    if (urlPath === "/api/upload-url") {
+      handleApi(req, res, uploadUrlHandler, "/api/upload-url");
+      return;
+    }
+    if (urlPath === "/api/download") {
+      handleApi(req, res, downloadHandler, "/api/download");
       return;
     }
     if (req.method !== "GET" && req.method !== "HEAD") {
@@ -170,10 +184,16 @@ http
   .listen(PORT, HOST, () => {
     const from = process.env.RFQ_FROM_EMAIL || "updates.from.kawsar@gmail.com";
     const keyOk = Boolean((process.env.BREVO_API_KEY || "").trim());
+    const r2Ok = Boolean(
+      (process.env.R2_ACCOUNT_ID || "").trim() &&
+        (process.env.R2_ACCESS_KEY_ID || "").trim() &&
+        (process.env.R2_SECRET_ACCESS_KEY || "").trim()
+    );
     console.log(`ready http://${HOST}:${PORT}`);
     console.log(`contact http://${HOST}:${PORT}/contact`);
     console.log(`thanks  http://${HOST}:${PORT}/thanks`);
     console.log(`Brevo key: ${keyOk ? "loaded" : "MISSING"}`);
+    console.log(`R2 creds: ${r2Ok ? "loaded" : "MISSING"}`);
     console.log(`RFQ_TO: info@manualvectortracing.com (hardcoded)`);
     console.log(`RFQ_FROM_EMAIL: ${from}`);
   });

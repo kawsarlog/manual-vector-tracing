@@ -73,13 +73,10 @@
   }
 
   const MAX_QUOTE_FILES = 5;
-  /** Email receive cap — files over this never reach the inbox through this form. */
-  const MAX_FILE_BYTES = 4 * 1024 * 1024;
-  const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
-  const MAX_ATTACH_FILE_BYTES = MAX_FILE_BYTES;
-  /** Keep total JSON body under Vercel hobby limit (~4.5 MB). Base64 adds ~33%. */
-  const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024;
-  const EMAIL_LIMIT_MSG = "Total file size must stay within 4 MB. Send larger files on WhatsApp.";
+  /** Per-file and total upload cap — files go to Cloudflare R2, not through Vercel body. */
+  const MAX_FILE_BYTES = 25 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+  const FILE_LIMIT_MSG = "Total file size must stay within 25 MB. Send larger files on WhatsApp.";
   const ALLOWED_EXT = new Set([
     "jpg",
     "jpeg",
@@ -129,41 +126,14 @@
     return `${(n / (1024 * 1024)).toFixed(n < 10 * 1024 * 1024 ? 1 : 0)} MB`;
   };
 
-  const stripDataUrlPrefix = (value) => {
-    const s = String(value || "");
-    const comma = s.indexOf(",");
-    if (s.startsWith("data:") && comma !== -1) return s.slice(comma + 1);
-    return s;
-  };
-
   /**
-   * Read a File as raw base64 (no data: URL prefix).
-   * @param {File} file
-   * @returns {Promise<string>}
-   */
-  const readFileAsBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          resolve(stripDataUrlPrefix(reader.result));
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-
-  /**
-   * Build files payload for /api/contact — attach when size budget allows.
+   * Upload each file to R2 via presigned PUT, then return metadata for /api/contact.
    * @param {File[]} files
-   * @returns {Promise<{ files: Array<{name:string,type:string,size:number,contentBase64?:string,note?:string}>, skippedLarge: number }>}
+   * @returns {Promise<{ files: Array<{name:string,type:string,size:number,key:string}>, skippedLarge: number }>}
    */
   const buildFilesPayload = async (files) => {
     const list = (files || []).slice(0, MAX_QUOTE_FILES);
     const out = [];
-    let budget = MAX_PAYLOAD_BYTES - 12 * 1024; /* leave room for text fields */
     let skippedLarge = 0;
 
     for (const file of list) {
@@ -173,29 +143,48 @@
         size: file.size,
       };
 
-      if (!file.size || file.size > MAX_ATTACH_FILE_BYTES) {
-        entry.note = "too large for email";
+      if (!file.size || file.size > MAX_FILE_BYTES) {
+        entry.note = "too large";
         skippedLarge += 1;
         out.push(entry);
         continue;
       }
 
+      const urlRes = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          size: file.size,
+        }),
+      });
+
+      let urlData = null;
       try {
-        const contentBase64 = await readFileAsBase64(file);
-        /* Base64 string length ≈ bytes in the JSON body for this field */
-        const encodedBytes = contentBase64.length;
-        if (encodedBytes > budget) {
-          entry.note = "too large for email";
-          skippedLarge += 1;
-          out.push(entry);
-          continue;
-        }
-        entry.contentBase64 = contentBase64;
-        budget -= encodedBytes;
+        urlData = await urlRes.json();
       } catch (_) {
-        entry.note = "too large for email";
-        skippedLarge += 1;
+        urlData = null;
       }
+
+      if (!urlRes.ok || !urlData || urlData.status !== "success" || !urlData.uploadUrl || !urlData.key) {
+        const msg = (urlData && urlData.message) || "Could not start file upload.";
+        throw new Error(msg);
+      }
+
+      const putRes = await fetch(urlData.uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!putRes.ok) {
+        throw new Error(`Upload failed for ${file.name} (${putRes.status}).`);
+      }
+
+      entry.key = urlData.key;
       out.push(entry);
     }
 
@@ -227,13 +216,13 @@
     if (!title || !hint) return;
     if (!selectedFiles.length) {
       title.textContent = "JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG & images";
-      hint.textContent = "Optional. Max 5 files, 4 MB total. Larger files: send on WhatsApp.";
+      hint.textContent = "Optional. Max 5 files, 25 MB total. Larger files: send on WhatsApp.";
       return;
     }
     const count = selectedFiles.length;
     title.textContent =
       count === 1 ? "1 file selected" : `${count} files selected (max ${MAX_QUOTE_FILES})`;
-    hint.textContent = "Max 4 MB total. Larger files: send on WhatsApp.";
+    hint.textContent = "Max 25 MB total. Larger files: send on WhatsApp.";
   };
 
   const renderSelectedFiles = () => {
@@ -333,7 +322,7 @@
       notes.push("Use JPG, PNG, TIF, PSD, PDF, AI, EPS, SVG, or a similar image file.");
     }
     if (rejectedSize) {
-      notes.push("Max 4 MB total. Send larger files on WhatsApp.");
+      notes.push("Max 25 MB total. Send larger files on WhatsApp.");
     }
     if (truncated) {
       notes.push(`You can select up to ${MAX_QUOTE_FILES} files. Only the first ${MAX_QUOTE_FILES} were kept.`);
@@ -403,7 +392,7 @@
       if (submitBtn) submitBtn.disabled = true;
       showStatus(
         selectedFiles.length
-          ? "Preparing files and sending your quote request…"
+          ? "Uploading files and sending your quote request…"
           : "Sending your quote request…",
         true
       );
@@ -423,7 +412,7 @@
         const { files: filesMeta, skippedLarge } = await buildFilesPayload(selectedFiles);
         if (skippedLarge) {
           showStatus(
-            `${EMAIL_LIMIT_MSG} <a href="${fallbackWaUrl}" target="_blank" rel="noopener noreferrer">Open WhatsApp</a>.`,
+            `${FILE_LIMIT_MSG} <a href="${fallbackWaUrl}" target="_blank" rel="noopener noreferrer">Open WhatsApp</a>.`,
             false
           );
           return;
