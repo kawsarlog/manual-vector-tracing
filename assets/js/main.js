@@ -172,11 +172,9 @@
         throw new Error(msg);
       }
 
+      /* No custom headers — keeps CORS simple and matches unsigned PutObject presign. */
       const putRes = await fetch(urlData.uploadUrl, {
         method: "PUT",
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
         body: file,
       });
 

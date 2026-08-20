@@ -69,6 +69,9 @@ function getR2Client() {
     region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    /* AWS SDK v3 defaults add CRC32 checksum params that break R2 browser PUT / CORS. */
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
   });
   return cachedClient;
 }
@@ -132,15 +135,14 @@ async function createUploadUrl({ fileName, contentType, size }) {
 
   const { bucket } = getConfig();
   const key = buildObjectKey(fileName);
-  const type = String(contentType || "application/octet-stream").slice(0, 120);
   const client = getR2Client();
+  /* Do not sign ContentType — browser Content-Type mismatches cause 403 SignatureDoesNotMatch. */
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: key,
-    ContentType: type,
   });
   const uploadUrl = await getSignedUrl(client, command, { expiresIn: 15 * 60 });
-  return { ok: true, uploadUrl, key, bucket, expiresIn: 15 * 60 };
+  return { ok: true, uploadUrl, key, bucket, contentType: contentType || "", expiresIn: 15 * 60 };
 }
 
 /**
