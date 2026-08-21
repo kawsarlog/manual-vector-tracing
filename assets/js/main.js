@@ -254,7 +254,8 @@
       removeBtn.type = "button";
       removeBtn.className = "file-list__remove";
       removeBtn.setAttribute("aria-label", `Remove ${file.name}`);
-      removeBtn.textContent = "Remove";
+      removeBtn.title = "Remove this file";
+      removeBtn.textContent = "×";
       removeBtn.addEventListener("click", () => {
         selectedFiles = selectedFiles.filter((_, i) => i !== index);
         syncFileInput();
@@ -350,7 +351,8 @@
     });
     fileInput.addEventListener("change", () => {
       if (!fileInput.files?.length) return;
-      applySelectedFiles(fileInput.files, { mode: "replace" });
+      /* Append so re-opening the picker adds to the selection instead of replacing it. */
+      applySelectedFiles(fileInput.files, { mode: "append" });
     });
   }
 
