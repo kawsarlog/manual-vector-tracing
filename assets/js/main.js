@@ -1,4 +1,22 @@
 (() => {
+  const reviewsTrack = document.querySelector(".reviews-track");
+  if (reviewsTrack && !reviewsTrack.dataset.loopReady) {
+    const originals = Array.from(reviewsTrack.children);
+    originals.forEach((card) => {
+      const clone = card.cloneNode(true);
+      clone.setAttribute("aria-hidden", "true");
+      clone.querySelectorAll("[aria-hidden]").forEach((el) => {
+        el.setAttribute("aria-hidden", "true");
+      });
+      clone.querySelectorAll("img").forEach((img) => {
+        img.setAttribute("loading", "lazy");
+        img.removeAttribute("fetchpriority");
+      });
+      reviewsTrack.appendChild(clone);
+    });
+    reviewsTrack.dataset.loopReady = "1";
+  }
+
   const toggle = document.querySelector(".nav-toggle");
   const nav = document.querySelector(".nav");
   if (toggle && nav) {
