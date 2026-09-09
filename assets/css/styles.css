@@ -2462,9 +2462,96 @@ select:focus {
   }
 }
 
+/* SEO service pages */
+.service-prose {
+  max-width: 46rem;
+}
+
+.service-prose h2 {
+  margin-bottom: 0.75rem;
+}
+
+.service-prose p + p {
+  margin-top: 0.85rem;
+}
+
+.service-bullets {
+  margin: 0.75rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.service-bullets li + li {
+  margin-top: 0.45rem;
+}
+
+.service-steps {
+  margin: 0;
+  padding-left: 1.25rem;
+  max-width: 46rem;
+}
+
+.service-steps li + li {
+  margin-top: 0.85rem;
+}
+
+.service-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 3rem;
+}
+
+.service-link-grid,
+.home-services-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.service-link-card,
+.home-service-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.service-link-card strong,
+.home-service-card strong {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.service-link-card span,
+.home-service-card span {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.service-link-card:hover,
+.home-service-card:hover {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 720px) {
+  .service-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn:hover,
-  .project:hover {
+  .project:hover,
+  .service-link-card:hover,
+  .home-service-card:hover {
     transform: none;
   }
 }

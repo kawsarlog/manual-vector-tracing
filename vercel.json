@@ -1,5 +1,47 @@
 {
   "framework": null,
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/manual-vector-tracing/",
+      "destination": "/manual-vector-tracing",
+      "permanent": true
+    },
+    {
+      "source": "/logo-redraw/",
+      "destination": "/logo-redraw",
+      "permanent": true
+    },
+    {
+      "source": "/png-to-vector/",
+      "destination": "/png-to-vector",
+      "permanent": true
+    },
+    {
+      "source": "/jpg-to-vector/",
+      "destination": "/jpg-to-vector",
+      "permanent": true
+    },
+    {
+      "source": "/print-ready-vector/",
+      "destination": "/print-ready-vector",
+      "permanent": true
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ]
 }

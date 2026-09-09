@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+Disallow: /thanks
+Disallow: /api/
+Disallow: /_qa/
+Disallow: /tmp-mobile-audit/
+Disallow: /.claude/
+
+Sitemap: https://www.manualvectortracing.com/sitemap.xml
