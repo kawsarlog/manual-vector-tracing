@@ -2511,21 +2511,16 @@ select:focus {
 .home-service-card {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 1.15rem 1.25rem;
+  gap: 0.55rem;
+  padding: 1.35rem 1.3rem 1.4rem;
+  align-items: center;
+  text-align: center;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
   text-decoration: none;
   color: inherit;
   transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.home-service-card {
-  gap: 0.55rem;
-  padding: 1.35rem 1.3rem 1.4rem;
-  align-items: center;
-  text-align: center;
 }
 
 .home-service-card__icon {
@@ -2547,7 +2542,7 @@ select:focus {
   color: var(--ink);
 }
 
-.service-link-card span,
+.service-link-card > span:not(.home-service-card__icon),
 .home-service-card > span:not(.home-service-card__icon) {
   color: var(--ink-soft);
   font-size: 0.95rem;
@@ -2561,6 +2556,7 @@ select:focus {
   box-shadow: 0 10px 24px rgba(15, 45, 80, 0.06);
 }
 
+.service-link-card:hover .home-service-card__icon,
 .home-service-card:hover .home-service-card__icon {
   transform: scale(1.06);
 }
@@ -2576,6 +2572,7 @@ select:focus {
   .project:hover,
   .service-link-card:hover,
   .home-service-card:hover,
+  .service-link-card:hover .home-service-card__icon,
   .home-service-card:hover .home-service-card__icon {
     transform: none;
   }
