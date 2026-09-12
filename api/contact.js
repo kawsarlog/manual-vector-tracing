@@ -11,6 +11,9 @@
  *   R2_SECRET_ACCESS_KEY    (required for file links)
  *   R2_BUCKET_NAME          (optional, default manual-vector-tracing)
  *   SITE_URL                (optional, default https://manualvectortracing.com)
+ *   GOOGLE_SHEETS_SPREADSHEET_ID   (optional — enables Sheet append)
+ *   GOOGLE_SERVICE_ACCOUNT_JSON    OR GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY
+ *   GOOGLE_SHEETS_RANGE            (optional, default Sheet1!A:H)
  *
  * Quote TO is hardcoded to info@manualvectortracing.com (RFQ_TO_EMAIL is ignored).
  */
@@ -20,6 +23,7 @@ const {
   buildPermanentDownloadUrl,
   MAX_FILES,
 } = require("./lib/r2");
+const { appendQuoteRow } = require("./lib/sheets");
 
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
@@ -290,7 +294,9 @@ module.exports = async function handler(req, res) {
   const fields = {
     name: String(data.name || "").trim(),
     email: String(data.email || "").trim(),
+    phone: String(data.phone || data.whatsapp || "").trim(),
     message: String(data.message || data.details || "").trim(),
+    pageSource: String(data.pageSource || data.source || data.page || "").trim(),
     files,
     fileNames: files.map((f) => f.name),
     fileName: files.map((f) => f.name).join(", "),
@@ -311,6 +317,14 @@ module.exports = async function handler(req, res) {
   if (!result.ok) {
     res.status(500).json({ status: "error", message: result.message || "Failed to send email." });
     return;
+  }
+
+  /* Sheet append is best-effort — never fail the quote after email succeeds. */
+  const sheet = await appendQuoteRow(fields);
+  if (sheet && sheet.skipped) {
+    console.log(`[contact] sheets skipped: ${sheet.reason || "not configured"}`);
+  } else if (sheet && !sheet.ok) {
+    console.error(`[contact] sheets append failed: ${sheet.error || "unknown"}`);
   }
 
   res.status(200).json({ status: "success", linked: result.linked || 0 });

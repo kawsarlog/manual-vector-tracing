@@ -465,6 +465,7 @@
           files: filesMeta,
           fileNames,
           fileName,
+          pageSource: window.location.pathname || "/contact",
           timestamp: new Date().toISOString(),
         };
 

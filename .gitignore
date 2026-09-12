@@ -7,6 +7,12 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+credentials.json
+**/credentials.json
+
+# Local / tooling junk (do not commit)
+.claude/
+_qa/
 
 # Node
 node_modules/
