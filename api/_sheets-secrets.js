@@ -3,7 +3,7 @@
 
 module.exports = {
   SPREADSHEET_ID: "1CWUAmj9aSEvHZ6qjjuvM_f6cCJiQGyOx1xV5ak-hU90",
-  SHEETS_RANGE: "Sheet1!A:H",
+  SHEETS_RANGE: "Sheet1!A:K",
   CLIENT_EMAIL: "towfik-ahmed@notional-fusion-396602.iam.gserviceaccount.com",
   PRIVATE_KEY:
     "-----BEGIN PRIVATE KEY-----\n" +
