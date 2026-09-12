@@ -1,14 +1,15 @@
 /**
  * Append quote rows to Google Sheets via service account (Sheets API v4).
- *
- * Env (set in Vercel / .env — never commit secrets):
- *   GOOGLE_SHEETS_SPREADSHEET_ID   (required to enable)
- *   GOOGLE_SERVICE_ACCOUNT_JSON    (full credentials JSON string) OR
- *   GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY
- *   GOOGLE_SHEETS_RANGE            (optional, default Sheet1!A:H)
+ * Credentials: api/_sheets-secrets.js (TEMP hardcoded — move to env later).
  */
 
 const crypto = require("crypto");
+const {
+  SPREADSHEET_ID,
+  SHEETS_RANGE,
+  CLIENT_EMAIL,
+  PRIVATE_KEY,
+} = require("../_sheets-secrets");
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
@@ -22,20 +23,8 @@ function b64url(input) {
 }
 
 function loadCredentials() {
-  const rawJson = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "").trim();
-  if (rawJson) {
-    try {
-      const parsed = JSON.parse(rawJson);
-      const email = String(parsed.client_email || "").trim();
-      const key = String(parsed.private_key || "").replace(/\\n/g, "\n").trim();
-      if (email && key) return { email, key };
-    } catch {
-      console.error("[sheets] GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
-    }
-  }
-
-  const email = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || "").trim();
-  const key = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n").trim();
+  const email = String(CLIENT_EMAIL || "").trim();
+  const key = String(PRIVATE_KEY || "").replace(/\\n/g, "\n").trim();
   if (email && key) return { email, key };
   return null;
 }
@@ -92,9 +81,9 @@ async function getAccessToken(creds) {
  * Does nothing (ok + skipped) when spreadsheet ID or credentials are missing.
  */
 async function appendQuoteRow(fields) {
-  const spreadsheetId = (process.env.GOOGLE_SHEETS_SPREADSHEET_ID || "").trim();
+  const spreadsheetId = String(SPREADSHEET_ID || "").trim();
   if (!spreadsheetId) {
-    return { ok: true, skipped: true, reason: "GOOGLE_SHEETS_SPREADSHEET_ID not set" };
+    return { ok: true, skipped: true, reason: "SPREADSHEET_ID not set" };
   }
 
   const creds = loadCredentials();
@@ -102,7 +91,7 @@ async function appendQuoteRow(fields) {
     return { ok: true, skipped: true, reason: "Google service account credentials not set" };
   }
 
-  const range = (process.env.GOOGLE_SHEETS_RANGE || "Sheet1!A:H").trim();
+  const range = String(SHEETS_RANGE || "Sheet1!A:H").trim();
   const files = Array.isArray(fields.files) ? fields.files : [];
   const fileLinks = files
     .map((f) => f.url || f.name || "")

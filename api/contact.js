@@ -11,10 +11,8 @@
  *   R2_SECRET_ACCESS_KEY    (required for file links)
  *   R2_BUCKET_NAME          (optional, default manual-vector-tracing)
  *   SITE_URL                (optional, default https://manualvectortracing.com)
- *   GOOGLE_SHEETS_SPREADSHEET_ID   (optional — enables Sheet append)
- *   GOOGLE_SERVICE_ACCOUNT_JSON    OR GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_PRIVATE_KEY
- *   GOOGLE_SHEETS_RANGE            (optional, default Sheet1!A:H)
  *
+ * Google Sheets: server-only secrets in api/_sheets-secrets.js (TEMP hardcoded).
  * Quote TO is hardcoded to info@manualvectortracing.com (RFQ_TO_EMAIL is ignored).
  */
 
